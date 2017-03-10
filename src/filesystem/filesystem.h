@@ -33,13 +33,14 @@ typedef struct {
 } TarArchive;
 
 typedef struct {
-  int isFused;
   vec_archive_t archives;
   char* writePath;
   const char* identity;
+  char* source;
+  int isFused;
 } FilesystemState;
 
-void lovrFilesystemInit();
+void lovrFilesystemInit(const char* argv1);
 void lovrFilesystemDestroy();
 int lovrFilesystemCreateDirectory(const char* path);
 int lovrFilesystemExists(const char* path);
@@ -47,8 +48,10 @@ int lovrFilesystemGetAppdataDirectory(char* dest, unsigned int size);
 int lovrFilesystemGetExecutablePath(char* dest, unsigned int size);
 const char* lovrFilesystemGetIdentity();
 const char* lovrFilesystemGetSaveDirectory();
+const char* lovrFilesystemGetSource();
 int lovrFilesystemIsDirectory(const char* path);
 int lovrFilesystemIsFile(const char* path);
+int lovrFilesystemIsFused();
 int lovrFilesystemMount(const char* source, int append);
 void* lovrFilesystemRead(const char* path, size_t* bytesRead);
 int lovrFilesystemRemove(const char* path);

@@ -48,6 +48,14 @@ static void pathJoin(char* dest, const char* p1, const char* p2) {
   snprintf(dest, LOVR_PATH_MAX, "%s/%s", p1, p2);
 }
 
+static void pathNormalize(char* path) {
+  char* p = strchr(path, '\\');
+  while (p) {
+    *p = '/';
+    p = strchr(p + 1, '\\');
+  }
+}
+
 // fs
 
 static int fsExists(Archive* archive, const char* path) {
@@ -228,8 +236,6 @@ static Archive* tarInit(const char* path) {
       free(tar);
       return NULL;
     }
-
-    state.isFused = 1;
   }
 
   // Read all entries in the archive
@@ -261,11 +267,31 @@ static Archive* tarInit(const char* path) {
 
 // lovr.filesystem
 
-void lovrFilesystemInit() {
-  state.isFused = 0;
+void lovrFilesystemInit(const char* argv1) {
   vec_init(&state.archives);
   state.writePath = NULL;
   state.identity = NULL;
+  state.source = NULL;
+  state.isFused = 1;
+
+  // Try to load an archive fused to the executable
+  char executable[LOVR_PATH_MAX];
+  lovrFilesystemGetExecutablePath(executable, LOVR_PATH_MAX);
+  if (lovrFilesystemMount(executable, 1)) {
+
+    // If that didn't work, try to load a folder/archive specified on the command line
+    state.isFused = 0;
+    state.source = realpath(argv1, NULL);
+    pathNormalize(state.source);
+    if (!state.source || lovrFilesystemMount(state.source, 1)) {
+      free(state.source);
+      state.source = NULL;
+    }
+  } else {
+    state.source = malloc(LOVR_PATH_MAX * sizeof(char));
+    strncpy(state.source, executable, LOVR_PATH_MAX);
+  }
+
   atexit(lovrFilesystemDestroy);
 }
 
@@ -275,6 +301,7 @@ void lovrFilesystemDestroy() {
   }
   vec_deinit(&state.archives);
   free(state.writePath);
+  free(state.source);
 }
 
 int lovrFilesystemCreateDirectory(const char* path) {
@@ -305,11 +332,13 @@ int lovrFilesystemGetAppdataDirectory(char* dest, unsigned int size) {
   }
 
   snprintf(dest, size, "%s/Library/Application Support", home);
+  pathNormalize(dest);
   return 0;
 #elif _WIN32
   PWSTR appData = NULL;
   SHGetKnownFolderPath(&FOLDERID_RoamingAppData, 0, NULL, &appData);
   wcstombs(dest, appData, size);
+  pathNormalize(dest);
   CoTaskMemFree(appData);
   return 0;
 #else
@@ -322,10 +351,15 @@ int lovrFilesystemGetAppdataDirectory(char* dest, unsigned int size) {
 int lovrFilesystemGetExecutablePath(char* dest, unsigned int size) {
 #ifdef __APPLE__
   if (_NSGetExecutablePath(dest, &size) == 0) {
+    pathNormalize(dest);
     return 0;
   }
 #elif _WIN32
-  return !GetModuleFileName(NULL, dest, size);
+  int err = GetModuleFileName(NULL, dest, size);
+  if (!err) {
+    pathNormalize(dest);
+    return 0;
+  }
 #else
 #error "This platform is missing an implementation for lovrFilesystemGetExecutablePath"
 #endif
@@ -339,6 +373,10 @@ const char* lovrFilesystemGetIdentity() {
 
 const char* lovrFilesystemGetSaveDirectory() {
   return state.writePath;
+}
+
+const char* lovrFilesystemGetSource() {
+  return state.source;
 }
 
 int lovrFilesystemIsDirectory(const char* path) {
@@ -361,6 +399,10 @@ int lovrFilesystemIsFile(const char* path) {
   return 0;
 }
 
+int lovrFilesystemIsFused(const char* path) {
+  return state.isFused;
+}
+
 int lovrFilesystemMount(const char* path, int append) {
   FOREACH_ARCHIVE(&state.archives) {
     if (!strncmp(archive->path, path, LOVR_PATH_MAX)) {
@@ -368,7 +410,7 @@ int lovrFilesystemMount(const char* path, int append) {
     }
   }
 
-  archive = NULL; // FOREACH_ARCHIVE defines this
+  archive = NULL; // FOREACH_ARCHIVE defines this...
   if ((archive = fsInit(path)) != NULL || (archive = tarInit(path)) != NULL) {
     if (append) {
       vec_push(&state.archives, archive);

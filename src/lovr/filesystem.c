@@ -55,8 +55,10 @@ const luaL_Reg lovrFilesystem[] = {
   { "getExecutablePath", l_lovrFilesystemGetExecutablePath },
   { "getIdentity", l_lovrFilesystemGetIdentity },
   { "getSaveDirectory", l_lovrFilesystemGetSaveDirectory },
+  { "getSource", l_lovrFilesystemGetSource },
   { "isDirectory", l_lovrFilesystemIsDirectory },
   { "isFile", l_lovrFilesystemIsFile },
+  { "isFused", l_lovrFilesystemIsFused },
   { "load", l_lovrFilesystemLoad },
   { "mount", l_lovrFilesystemMount },
   { "read", l_lovrFilesystemRead },
@@ -71,18 +73,10 @@ int l_lovrFilesystemInit(lua_State* L) {
   lua_newtable(L);
   luaL_register(L, NULL, lovrFilesystem);
 
-  lovrFilesystemInit();
-
-  // Try to load an embedded archive, otherwise load the source specified on the command line
-  char executable[LOVR_PATH_MAX];
-  lovrFilesystemGetExecutablePath(executable, LOVR_PATH_MAX);
-  if (lovrFilesystemMount(executable, 1)) {
-    lua_getglobal(L, "arg");
-    lua_rawgeti(L, -1, 1);
-    const char* source = lua_tostring(L, -1);
-    lovrFilesystemMount(source, 1);
-    lua_pop(L, 2);
-  }
+  lua_getglobal(L, "arg");
+  lua_rawgeti(L, -1, 1);
+  lovrFilesystemInit(lua_tostring(L, -1));
+  lua_pop(L, 2);
 
   // Add custom package loader
   lua_getglobal(L, "table");
@@ -169,6 +163,12 @@ int l_lovrFilesystemGetSaveDirectory(lua_State* L) {
   return 1;
 }
 
+int l_lovrFilesystemGetSource(lua_State* L) {
+  const char* source = lovrFilesystemGetSource();
+  lua_pushstring(L, source);
+  return 1;
+}
+
 int l_lovrFilesystemIsDirectory(lua_State* L) {
   const char* path = luaL_checkstring(L, 1);
   lua_pushboolean(L, lovrFilesystemIsDirectory(path));
@@ -178,6 +178,11 @@ int l_lovrFilesystemIsDirectory(lua_State* L) {
 int l_lovrFilesystemIsFile(lua_State* L) {
   const char* path = luaL_checkstring(L, 1);
   lua_pushboolean(L, lovrFilesystemIsFile(path));
+  return 1;
+}
+
+int l_lovrFilesystemIsFused(lua_State* L) {
+  lua_pushboolean(L, lovrFilesystemIsFused());
   return 1;
 }
 
