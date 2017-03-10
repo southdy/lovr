@@ -126,7 +126,6 @@ set(LOVR_LIB
   ${LOVR_LUA}
   ${LOVR_GL}
   ${LOVR_GLFW}
-  ${LOVR_PHYSFS}
   ${LOVR_ASSIMP}
   ${LOVR_OPENAL}
   ${LOVR_FREETYPE}
@@ -139,7 +138,6 @@ if(WIN32)
   move_dll(${LOVR_LUA})
   move_dll(${LOVR_GL})
   move_dll(${LOVR_GLFW})
-  move_dll(${LOVR_PHYSFS})
   move_dll(${LOVR_ASSIMP})
   move_dll(${LOVR_OPENAL})
   move_dll(${LOVR_FREETYPE})

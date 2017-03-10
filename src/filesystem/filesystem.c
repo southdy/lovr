@@ -2,16 +2,18 @@
 #include "util.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #ifdef _WIN32
 #include <windows.h>
 #include <initguid.h>
 #include <KnownFolders.h>
 #include <ShlObj.h>
 #include <wchar.h>
+#define S_ISREG(mode)  (((mode) & S_IFMT) == S_IFREG)
+#define S_ISDIR(mode)  (((mode) & S_IFMT) == S_IFDIR)
 #else
 #include <pwd.h>
 #include <unistd.h>
-#include <sys/stat.h>
 #include <errno.h>
 #endif
 
@@ -39,7 +41,7 @@ static int mkdir_p(const char* path) {
   }
 
   mkdir(path, 0700);
-  return access(path, F_OK);
+  return access(path, 0);
 }
 
 static void pathJoin(char* dest, const char* p1, const char* p2) {
@@ -51,7 +53,7 @@ static void pathJoin(char* dest, const char* p1, const char* p2) {
 static int fsExists(Archive* archive, const char* path) {
   char fullpath[LOVR_PATH_MAX];
   pathJoin(fullpath, archive->path, path);
-  return !access(fullpath, F_OK);
+  return !access(fullpath, 0);
 }
 
 static int fsIsDirectory(Archive* archive, const char* path) {
