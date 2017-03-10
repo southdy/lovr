@@ -55,17 +55,6 @@ else()
   set(LOVR_GLFW ${GLFW_LIBRARIES})
 endif()
 
-# PhysicsFS
-if(WIN32)
-  add_subdirectory(deps/physfs physfs)
-  include_directories(deps/physfs)
-  set(LOVR_PHYSFS physfs)
-else()
-  find_package(PhysFS REQUIRED)
-  include_directories(${PHYSFS_INCLUDE_DIR})
-  set(LOVR_PHYSFS ${PHYSFS_LIBRARY})
-endif()
-
 # assimp
 set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "")
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "")
