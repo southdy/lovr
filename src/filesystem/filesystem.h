@@ -7,6 +7,8 @@
 
 #define LOVR_PATH_MAX 1024
 
+typedef void getDirectoryItemsCallback(const char* path, void* userdata);
+
 typedef enum {
   ARCHIVE_FS,
   ARCHIVE_TAR
@@ -17,6 +19,7 @@ typedef struct Archive {
   const char* path;
   void* userdata;
   int (*exists)(struct Archive* archive, const char* path);
+  void (*getDirectoryItems)(struct Archive* archive, const char* path, getDirectoryItemsCallback callback, void* userdata);
   int (*getSize)(struct Archive* archive, const char* path, size_t* size);
   int (*isDirectory)(struct Archive* archive, const char* path);
   int (*isFile)(struct Archive* archive, const char* path);
@@ -47,6 +50,7 @@ void lovrFilesystemDestroy();
 int lovrFilesystemCreateDirectory(const char* path);
 int lovrFilesystemExists(const char* path);
 int lovrFilesystemGetAppdataDirectory(char* dest, unsigned int size);
+void lovrFilesystemGetDirectoryItems(const char* path, getDirectoryItemsCallback callback, void* userdata);
 int lovrFilesystemGetExecutablePath(char* dest, unsigned int size);
 const char* lovrFilesystemGetIdentity();
 int lovrFilesystemGetLastModified(const char* path);

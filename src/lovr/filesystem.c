@@ -3,6 +3,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void pushDirectoryItem(const char* path, void* userdata) {
+  lua_State* L = userdata;
+  int n = lua_objlen(L, -1);
+  lua_pushstring(L, path);
+  lua_rawseti(L, -2, n + 1);
+}
+
 // Loader to help Lua's require understand the archive system.
 static int filesystemLoader(lua_State* L) {
   const char* module = luaL_checkstring(L, -1);
@@ -52,6 +59,7 @@ const luaL_Reg lovrFilesystem[] = {
   { "createDirectory", l_lovrFilesystemCreateDirectory },
   { "exists", l_lovrFilesystemExists },
   { "getAppdataDirectory", l_lovrFilesystemGetAppdataDirectory },
+  { "getDirectoryItems", l_lovrFilesystemGetDirectoryItems },
   { "getExecutablePath", l_lovrFilesystemGetExecutablePath },
   { "getIdentity", l_lovrFilesystemGetIdentity },
   { "getLastModified", l_lovrFilesystemGetLastModified },
@@ -115,6 +123,13 @@ int l_lovrFilesystemCreateDirectory(lua_State* L) {
 int l_lovrFilesystemExists(lua_State* L) {
   const char* path = luaL_checkstring(L, 1);
   lua_pushboolean(L, lovrFilesystemExists(path));
+  return 1;
+}
+
+int l_lovrFilesystemGetDirectoryItems(lua_State* L) {
+  const char* path = luaL_checkstring(L, 1);
+  lua_newtable(L);
+  lovrFilesystemGetDirectoryItems(path, pushDirectoryItem, L);
   return 1;
 }
 

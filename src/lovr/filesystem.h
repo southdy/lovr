@@ -6,6 +6,7 @@ int l_lovrFilesystemAppend(lua_State* L);
 int l_lovrFilesystemCreateDirectory(lua_State* L);
 int l_lovrFilesystemExists(lua_State* L);
 int l_lovrFilesystemGetAppdataDirectory(lua_State* L);
+int l_lovrFilesystemGetDirectoryItems(lua_State* L);
 int l_lovrFilesystemGetExecutablePath(lua_State* L);
 int l_lovrFilesystemGetIdentity(lua_State* L);
 int l_lovrFilesystemGetLastModified(lua_State* L);

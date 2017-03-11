@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <libgen.h>
 #ifdef _WIN32
 #include <windows.h>
 #include <initguid.h>
@@ -62,6 +65,25 @@ static int fsExists(Archive* archive, const char* path) {
   char fullpath[LOVR_PATH_MAX];
   pathJoin(fullpath, archive->path, path);
   return !access(fullpath, 0);
+}
+
+static void fsGetDirectoryItems(Archive* archive, const char* path, getDirectoryItemsCallback callback, void* userdata) {
+  char fullpath[LOVR_PATH_MAX];
+  pathJoin(fullpath, archive->path, path);
+
+  DIR* dir;
+  if ((dir = opendir(fullpath)) == NULL) {
+    return;
+  }
+
+  struct dirent* item;
+  while ((item = readdir(dir)) != NULL) {
+    if (strcmp(item->d_name, ".") && strcmp(item->d_name, "..")) {
+      callback(item->d_name, userdata);
+    }
+  }
+
+  closedir(dir);
 }
 
 static int fsGetSize(Archive* archive, const char* path, size_t* size) {
@@ -143,6 +165,7 @@ static Archive* fsInit(const char* path) {
   archive->path = path;
   archive->userdata = NULL;
   archive->exists = fsExists;
+  archive->getDirectoryItems = fsGetDirectoryItems;
   archive->getSize = fsGetSize;
   archive->isDirectory = fsIsDirectory;
   archive->isFile = fsIsFile;
@@ -168,6 +191,21 @@ static int tarLoad(Archive* archive, const char* path, mtar_header_t* header) {
 static int tarExists(Archive* archive, const char* path) {
   TarArchive* tar = archive->userdata;
   return map_get(&tar->entries, path) != NULL;
+}
+
+static void tarGetDirectoryItems(Archive* archive, const char* path, getDirectoryItemsCallback callback, void* userdata) {
+  TarArchive* tar = archive->userdata;
+  map_iter_t iter = map_iter(&tar->entries);
+  const char* key;
+  char tmp[LOVR_PATH_MAX];
+  while ((key = map_next(&tar->entries, &iter)) != NULL) {
+    if (strcmp(key, ".") && strcmp(key, "..")) {
+      strncpy(tmp, key, LOVR_PATH_MAX);
+      if (!strcmp(dirname(tmp), path)) {
+        callback(path, userdata);
+      }
+    }
+  }
 }
 
 static int tarGetSize(Archive* archive, const char* path, size_t* size) {
@@ -304,6 +342,7 @@ static Archive* tarInit(const char* path) {
   archive->path = path;
   archive->userdata = tar;
   archive->exists = tarExists;
+  archive->getDirectoryItems = tarGetDirectoryItems;
   archive->getSize = tarGetSize;
   archive->isDirectory = tarIsDirectory;
   archive->isFile = tarIsFile;
@@ -394,6 +433,12 @@ int lovrFilesystemGetAppdataDirectory(char* dest, unsigned int size) {
 #endif
 
   return 1;
+}
+
+void lovrFilesystemGetDirectoryItems(const char* path, getDirectoryItemsCallback callback, void* userdata) {
+  FOREACH_ARCHIVE(&state.archives) {
+    archive->getDirectoryItems(archive, path, callback, userdata);
+  }
 }
 
 int lovrFilesystemGetExecutablePath(char* dest, unsigned int size) {
