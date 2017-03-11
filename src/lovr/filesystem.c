@@ -54,6 +54,7 @@ const luaL_Reg lovrFilesystem[] = {
   { "getAppdataDirectory", l_lovrFilesystemGetAppdataDirectory },
   { "getExecutablePath", l_lovrFilesystemGetExecutablePath },
   { "getIdentity", l_lovrFilesystemGetIdentity },
+  { "getLastModified", l_lovrFilesystemGetLastModified },
   { "getRealDirectory", l_lovrFilesystemGetRealDirectory },
   { "getSaveDirectory", l_lovrFilesystemGetSaveDirectory },
   { "getSource", l_lovrFilesystemGetSource },
@@ -145,6 +146,19 @@ int l_lovrFilesystemGetIdentity(lua_State* L) {
 
   if (identity) {
     lua_pushstring(L, identity);
+  } else {
+    lua_pushnil(L);
+  }
+
+  return 1;
+}
+
+int l_lovrFilesystemGetLastModified(lua_State* L) {
+  const char* path = luaL_checkstring(L, 1);
+  int lastModified = lovrFilesystemGetLastModified(path);
+
+  if (lastModified) {
+    lua_pushnumber(L, lastModified);
   } else {
     lua_pushnil(L);
   }

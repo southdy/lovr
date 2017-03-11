@@ -80,6 +80,18 @@ static int fsIsFile(Archive* archive, const char* path) {
   return !stat(fullpath, &st) && S_ISREG(st.st_mode);
 }
 
+static int fsLastModified(Archive* archive, const char* path) {
+  char fullpath[LOVR_PATH_MAX];
+  pathJoin(fullpath, archive->path, path);
+
+  struct stat st;
+  if (stat(fullpath, &st)) {
+    return 0;
+  }
+
+  return st.st_mtimespec.tv_sec;
+}
+
 static void* fsRead(Archive* archive, const char* path, size_t* bytesRead) {
   char fullpath[LOVR_PATH_MAX];
   pathJoin(fullpath, archive->path, path);
@@ -120,6 +132,7 @@ static Archive* fsInit(const char* path) {
   archive->exists = fsExists;
   archive->isDirectory = fsIsDirectory;
   archive->isFile = fsIsFile;
+  archive->lastModified = fsLastModified;
   archive->read = fsRead;
   archive->unmount = fsUnmount;
   return archive;
@@ -151,6 +164,15 @@ static int tarIsDirectory(Archive* archive, const char* path) {
 static int tarIsFile(Archive* archive, const char* path) {
   mtar_header_t header;
   return !tarLoad(archive, path, &header) && header.type == MTAR_TREG;
+}
+
+static int tarLastModified(Archive* archive, const char* path) {
+  mtar_header_t header;
+  if (tarLoad(archive, path, &header)) {
+    return 0;
+  }
+
+  return header.mtime;
 }
 
 static void* tarRead(Archive* archive, const char* path, size_t* bytesRead) {
@@ -260,6 +282,7 @@ static Archive* tarInit(const char* path) {
   archive->exists = tarExists;
   archive->isDirectory = tarIsDirectory;
   archive->isFile = tarIsFile;
+  archive->lastModified = tarLastModified;
   archive->read = tarRead;
   archive->unmount = tarUnmount;
   return archive;
@@ -369,6 +392,17 @@ int lovrFilesystemGetExecutablePath(char* dest, unsigned int size) {
 
 const char* lovrFilesystemGetIdentity() {
   return state.identity;
+}
+
+int lovrFilesystemGetLastModified(const char* path) {
+  FOREACH_ARCHIVE(&state.archives) {
+    int lastModified = archive->lastModified(archive, path);
+    if (lastModified) {
+      return lastModified;
+    }
+  }
+
+  return 0;
 }
 
 const char* lovrFilesystemGetRealDirectory(const char* path) {

@@ -8,6 +8,7 @@ int l_lovrFilesystemExists(lua_State* L);
 int l_lovrFilesystemGetAppdataDirectory(lua_State* L);
 int l_lovrFilesystemGetExecutablePath(lua_State* L);
 int l_lovrFilesystemGetIdentity(lua_State* L);
+int l_lovrFilesystemGetLastModified(lua_State* L);
 int l_lovrFilesystemGetRealDirectory(lua_State* L);
 int l_lovrFilesystemGetSaveDirectory(lua_State* L);
 int l_lovrFilesystemGetSource(lua_State* L);

@@ -19,6 +19,7 @@ typedef struct Archive {
   int (*exists)(struct Archive* archive, const char* path);
   int (*isDirectory)(struct Archive* archive, const char* path);
   int (*isFile)(struct Archive* archive, const char* path);
+  int (*lastModified)(struct Archive* archive, const char* path);
   void* (*read)(struct Archive* archive, const char* path, size_t* bytesRead);
   void (*unmount)(struct Archive* archive);
 } Archive;
@@ -47,6 +48,7 @@ int lovrFilesystemExists(const char* path);
 int lovrFilesystemGetAppdataDirectory(char* dest, unsigned int size);
 int lovrFilesystemGetExecutablePath(char* dest, unsigned int size);
 const char* lovrFilesystemGetIdentity();
+int lovrFilesystemGetLastModified(const char* path);
 const char* lovrFilesystemGetRealDirectory(const char* path);
 const char* lovrFilesystemGetSaveDirectory();
 const char* lovrFilesystemGetSource();
