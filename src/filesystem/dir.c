@@ -4,9 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <dirent.h>
-#ifndef _WIN32
+#include <sys/types.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <unistd.h>
+#include <dirent.h>
 #endif
 
 static int dirExists(Archive* archive, const char* path) {
@@ -19,6 +22,19 @@ static void dirGetDirectoryItems(Archive* archive, const char* path, getDirector
   char fullpath[LOVR_PATH_MAX];
   path_join(fullpath, archive->path, path);
 
+#ifdef _WIN32
+  path_join(fullpath, fullpath, "/*");
+  LPWIN32_FIND_DATA findFileData;
+  HANDLE handle = FindFirstFile(fullpath, &findFileData);
+  char tmp[LOVR_PATH_MAX];
+  if (handle != INVALID_HANDLE_VALUE) {
+    do {
+      wcstombs(tmp, findFileData->cFileName, LOVR_PATH_MAX);
+      callback(tmp, userdata);
+    } while (FindNextFile(handle, findFileData));
+  }
+  FindClose(handle);
+#else
   DIR* dir;
   if ((dir = opendir(fullpath)) == NULL) {
     return;
@@ -32,6 +48,7 @@ static void dirGetDirectoryItems(Archive* archive, const char* path, getDirector
   }
 
   closedir(dir);
+#endif
 }
 
 static int dirGetSize(Archive* archive, const char* path, size_t* size) {
@@ -52,7 +69,7 @@ static int dirIsDirectory(Archive* archive, const char* path) {
   path_join(fullpath, archive->path, path);
 
   struct stat st;
-  return !stat(fullpath, &st) && S_ISDIR(st.st_mode);
+  return !stat(fullpath, &st) && (st.st_mode & S_IFMT) == S_IFDIR;
 }
 
 static int dirIsFile(Archive* archive, const char* path) {
@@ -60,7 +77,7 @@ static int dirIsFile(Archive* archive, const char* path) {
   path_join(fullpath, archive->path, path);
 
   struct stat st;
-  return !stat(fullpath, &st) && S_ISREG(st.st_mode);
+  return !stat(fullpath, &st) && (st.st_mode & S_IFMT) == S_IFREG;
 }
 
 static int dirLastModified(Archive* archive, const char* path) {
@@ -72,7 +89,7 @@ static int dirLastModified(Archive* archive, const char* path) {
     return 0;
   }
 
-  return st.st_mtimespec.tv_sec;
+  return st.st_mtime;
 }
 
 static void* dirRead(Archive* archive, const char* path, size_t* bytesRead) {
@@ -102,7 +119,7 @@ static void dirUnmount(Archive* archive) {
 
 Archive* lovrFilesystemMountDir(const char* path) {
   struct stat st;
-  if (stat(path, &st) || !S_ISDIR(st.st_mode)) {
+  if (stat(path, &st) || (st.st_mode & S_IFMT) != S_IFDIR) {
     return NULL;
   }
 

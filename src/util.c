@@ -5,9 +5,7 @@
 #include <stdarg.h>
 #include <sys/stat.h>
 #ifdef _WIN32
-#include <Windows.h>
-#define S_ISREG(mode) (((mode) & S_IFMT) == S_IFREG)
-#define S_ISDIR(mode) (((mode) & S_IFMT) == S_IFDIR)
+#include <windows.h>
 #else
 #include <unistd.h>
 #endif
@@ -110,7 +108,7 @@ int mkdir_p(const char* path) {
 
   mkdir(path, 0700);
   struct stat st;
-  return stat(path, &st) || !S_ISDIR(st.st_mode);
+  return stat(path, &st) || (st.st_mode & S_IFMT) == S_IFDIR;
 }
 
 void path_join(char* dest, const char* p1, const char* p2) {
