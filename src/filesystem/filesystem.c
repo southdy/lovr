@@ -64,6 +64,19 @@ static int fsExists(Archive* archive, const char* path) {
   return !access(fullpath, 0);
 }
 
+static int fsGetSize(Archive* archive, const char* path, size_t* size) {
+  char fullpath[LOVR_PATH_MAX];
+  pathJoin(fullpath, archive->path, path);
+
+  struct stat st;
+  if (stat(fullpath, &st)) {
+    return 1;
+  }
+
+  *size = st.st_size;
+  return 0;
+}
+
 static int fsIsDirectory(Archive* archive, const char* path) {
   char fullpath[LOVR_PATH_MAX];
   pathJoin(fullpath, archive->path, path);
@@ -130,6 +143,7 @@ static Archive* fsInit(const char* path) {
   archive->path = path;
   archive->userdata = NULL;
   archive->exists = fsExists;
+  archive->getSize = fsGetSize;
   archive->isDirectory = fsIsDirectory;
   archive->isFile = fsIsFile;
   archive->lastModified = fsLastModified;
@@ -154,6 +168,16 @@ static int tarLoad(Archive* archive, const char* path, mtar_header_t* header) {
 static int tarExists(Archive* archive, const char* path) {
   TarArchive* tar = archive->userdata;
   return map_get(&tar->entries, path) != NULL;
+}
+
+static int tarGetSize(Archive* archive, const char* path, size_t* size) {
+  mtar_header_t header;
+  if (tarLoad(archive, path, &header)) {
+    return 1;
+  }
+
+  *size = header.size;
+  return 0;
 }
 
 static int tarIsDirectory(Archive* archive, const char* path) {
@@ -280,6 +304,7 @@ static Archive* tarInit(const char* path) {
   archive->path = path;
   archive->userdata = tar;
   archive->exists = tarExists;
+  archive->getSize = tarGetSize;
   archive->isDirectory = tarIsDirectory;
   archive->isFile = tarIsFile;
   archive->lastModified = tarLastModified;
@@ -417,6 +442,17 @@ const char* lovrFilesystemGetRealDirectory(const char* path) {
 
 const char* lovrFilesystemGetSaveDirectory() {
   return state.writePath;
+}
+
+int lovrFilesystemGetSize(const char* path, size_t* size) {
+  FOREACH_ARCHIVE(&state.archives) {
+    if (!archive->getSize(archive, path, size)) {
+      return 0;
+    }
+  }
+
+  *size = 0;
+  return 1;
 }
 
 const char* lovrFilesystemGetSource() {

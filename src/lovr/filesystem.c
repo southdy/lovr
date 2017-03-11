@@ -57,6 +57,7 @@ const luaL_Reg lovrFilesystem[] = {
   { "getLastModified", l_lovrFilesystemGetLastModified },
   { "getRealDirectory", l_lovrFilesystemGetRealDirectory },
   { "getSaveDirectory", l_lovrFilesystemGetSaveDirectory },
+  { "getSize", l_lovrFilesystemGetSize },
   { "getSource", l_lovrFilesystemGetSource },
   { "isDirectory", l_lovrFilesystemIsDirectory },
   { "isFile", l_lovrFilesystemIsFile },
@@ -186,6 +187,19 @@ int l_lovrFilesystemGetSaveDirectory(lua_State* L) {
     lua_pushstring(L, saveDirectory);
   } else {
     lua_pushnil(L);
+  }
+
+  return 1;
+}
+
+int l_lovrFilesystemGetSize(lua_State* L) {
+  const char* path = luaL_checkstring(L, 1);
+  size_t size;
+
+  if (lovrFilesystemGetSize(path, &size)) {
+    lua_pushnil(L);
+  } else {
+    lua_pushinteger(L, size);
   }
 
   return 1;
