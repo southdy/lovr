@@ -1,9 +1,13 @@
 #include "util.h"
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <stdarg.h>
+#include <sys/stat.h>
 #ifdef _WIN32
 #include <Windows.h>
+#define S_ISREG(mode) (((mode) & S_IFMT) == S_IFREG)
+#define S_ISDIR(mode) (((mode) & S_IFMT) == S_IFDIR)
 #else
 #include <unistd.h>
 #endif
@@ -87,4 +91,36 @@ size_t utf8_decode(const char *s, const char *e, unsigned *pch) {
 fallback:
   *pch = ch;
   return 1;
+}
+
+int mkdir_p(const char* path) {
+  char tmp[LOVR_PATH_MAX];
+  strncpy(tmp, path, LOVR_PATH_MAX);
+  for (char* p = tmp + 1; *p; p++) {
+    if (*p == '/') {
+      *p = '\0';
+#if _WIN32
+      CreateDirectory(tmp, NULL);
+#else
+      mkdir(tmp, 0700);
+#endif
+      *p = '/';
+    }
+  }
+
+  mkdir(path, 0700);
+  struct stat st;
+  return stat(path, &st) || !S_ISDIR(st.st_mode);
+}
+
+void path_join(char* dest, const char* p1, const char* p2) {
+  snprintf(dest, LOVR_PATH_MAX, "%s/%s", p1, p2);
+}
+
+void path_normalize(char* path) {
+  char* p = strchr(path, '\\');
+  while (p) {
+    *p = '/';
+    p = strchr(p + 1, '\\');
+  }
 }
