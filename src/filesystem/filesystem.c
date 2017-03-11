@@ -371,6 +371,16 @@ const char* lovrFilesystemGetIdentity() {
   return state.identity;
 }
 
+const char* lovrFilesystemGetRealDirectory(const char* path) {
+  FOREACH_ARCHIVE(&state.archives) {
+    if (archive->exists(archive, path)) {
+      return archive->path;
+    }
+  }
+
+  return NULL;
+}
+
 const char* lovrFilesystemGetSaveDirectory() {
   return state.writePath;
 }

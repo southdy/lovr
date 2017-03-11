@@ -47,6 +47,7 @@ int lovrFilesystemExists(const char* path);
 int lovrFilesystemGetAppdataDirectory(char* dest, unsigned int size);
 int lovrFilesystemGetExecutablePath(char* dest, unsigned int size);
 const char* lovrFilesystemGetIdentity();
+const char* lovrFilesystemGetRealDirectory(const char* path);
 const char* lovrFilesystemGetSaveDirectory();
 const char* lovrFilesystemGetSource();
 int lovrFilesystemIsDirectory(const char* path);
