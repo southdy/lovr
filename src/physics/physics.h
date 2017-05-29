@@ -1,4 +1,5 @@
 #include "util.h"
+#include "graphics/mesh.h"
 #include "lib/vec/vec.h"
 #include "lib/map/map.h"
 #include <stdint.h>
@@ -14,7 +15,8 @@ typedef enum {
   SHAPE_SPHERE,
   SHAPE_BOX,
   SHAPE_CAPSULE,
-  SHAPE_CYLINDER
+  SHAPE_CYLINDER,
+  SHAPE_MESH
 } ShapeType;
 
 typedef enum {
@@ -57,6 +59,14 @@ typedef Shape SphereShape;
 typedef Shape BoxShape;
 typedef Shape CapsuleShape;
 typedef Shape CylinderShape;
+
+typedef struct {
+  Shape shape;
+  dTriMeshDataID data;
+  float* vertices;
+  float* normals;
+  unsigned int* indices;
+} MeshShape;
 
 typedef struct {
   Ref ref;
@@ -187,6 +197,9 @@ float lovrCylinderShapeGetRadius(CylinderShape* cylinder);
 void lovrCylinderShapeSetRadius(CylinderShape* cylinder, float radius);
 float lovrCylinderShapeGetLength(CylinderShape* cylinder);
 void lovrCylinderShapeSetLength(CylinderShape* cylinder, float length);
+
+MeshShape* lovrMeshShapeCreate(Mesh* mesh);
+void lovrMeshShapeDestroy(const Ref* ref);
 
 void lovrJointDestroy(const Ref* ref);
 void lovrJointDestroyData(Joint* joint);

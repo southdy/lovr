@@ -1,4 +1,5 @@
 #include "api/lovr.h"
+#include "graphics/model.h"
 #include "physics/physics.h"
 
 static void collisionResolver(World* world, void* userdata) {
@@ -78,6 +79,15 @@ int l_lovrWorldNewSphereCollider(lua_State* L) {
   float radius = luaL_optnumber(L, 2, 1.f);
   Collider* collider = lovrColliderCreate(world);
   lovrColliderAddShape(collider, lovrSphereShapeCreate(radius));
+  luax_pushtype(L, Collider, collider);
+  return 1;
+}
+
+int l_lovrWorldNewMeshCollider(lua_State* L) {
+  World* world = luax_checktype(L, 1, World);
+  Model* model = luax_checktype(L, 2, Model);
+  Collider* collider = lovrColliderCreate(world);
+  lovrColliderAddShape(collider, (Shape*) lovrMeshShapeCreate(model->mesh));
   luax_pushtype(L, Collider, collider);
   return 1;
 }

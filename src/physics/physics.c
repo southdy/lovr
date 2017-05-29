@@ -716,6 +716,10 @@ void lovrShapeGetMass(Shape* shape, float density, float* cx, float* cy, float* 
       dMassSetCylinder(&m, density, 3, radius, length);
       break;
     }
+
+    case SHAPE_MESH: {
+      dMassSetTrimesh(&m, density, shape->id);
+    }
   }
 
   const dReal* position = dGeomGetOffsetPosition(shape->id);
@@ -845,6 +849,31 @@ float lovrCylinderShapeGetLength(CylinderShape* cylinder) {
 
 void lovrCylinderShapeSetLength(CylinderShape* cylinder, float length) {
   dGeomCylinderSetParams(cylinder->id, lovrCylinderShapeGetRadius(cylinder), length);
+}
+
+MeshShape* lovrMeshShapeCreate(Mesh* mesh) {
+  MeshShape* shape = lovrAlloc(sizeof(MeshShape), lovrMeshShapeDestroy);
+  if (!shape) return NULL;
+
+  shape->data = dGeomTriMeshDataCreate();
+
+  dGeomTriMeshDataBuildSingle1(shape->data, mesh->data, mesh->stride, mesh->count, mesh->map.data, mesh->map.length, 3 * sizeof(unsigned int), (char*) mesh->data + 3 * sizeof(float));
+
+  shape->shape.type = SHAPE_MESH;
+  shape->shape.id = dCreateTriMesh(0, mesh->data, NULL, NULL, NULL);
+  dGeomSetData(shape->shape.id, shape);
+
+  return shape;
+}
+
+void lovrMeshShapeDestroy(const Ref* ref) {
+  Shape* shape = containerof(ref, Shape);
+  MeshShape* mesh = (MeshShape*) shape;
+  dGeomTriMeshDataDestroy(mesh->data);
+  free(mesh->vertices);
+  free(mesh->normals);
+  free(mesh->indices);
+  lovrShapeDestroy(&mesh->shape.ref);
 }
 
 void lovrJointDestroy(const Ref* ref) {
