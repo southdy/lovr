@@ -12,16 +12,13 @@ static void assimpNodeTraversal(ModelNode* node, struct aiNode* assimpNode) {
   aiTransposeMatrix4(&m);
   mat4_set(node->transform, (float*) &m);
 
-  // Meshes
-  vec_init(&node->meshes);
-  vec_pusharr(&node->meshes, assimpNode->mMeshes, assimpNode->mNumMeshes);
-
   // Children
-  vec_init(&node->children);
+  node->children = malloc(assimpNode->mNumChildren * sizeof(ModelNode*));
   for (unsigned int n = 0; n < assimpNode->mNumChildren; n++) {
     ModelNode* child = malloc(sizeof(ModelNode));
+    child->parent = node;
     assimpNodeTraversal(child, assimpNode->mChildren[n]);
-    vec_push(&node->children, child);
+    node->children[n] = child;
   }
 }
 
@@ -29,73 +26,77 @@ ModelData* lovrModelDataCreate(Blob* blob) {
   ModelData* modelData = malloc(sizeof(ModelData));
   if (!modelData) return NULL;
 
-  modelData->hasNormals = 0;
-  modelData->hasTexCoords = 0;
-
   unsigned int flags = aiProcessPreset_TargetRealtime_MaxQuality | aiProcess_OptimizeGraph | aiProcess_FlipUVs;
   const struct aiScene* scene = aiImportFileFromMemory(blob->data, blob->size, flags, NULL);
 
-  // Meshes
-  vec_init(&modelData->meshes);
+  // Figure out how much data we need
+  modelData->vertexCount = 0;
+  modelData->indexCount = 0;
+  modelData->hasNormals = 0;
+  modelData->hasUVs = 0;
+
   for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
     struct aiMesh* assimpMesh = scene->mMeshes[m];
-    ModelMesh* mesh = malloc(sizeof(ModelMesh));
-    vec_push(&modelData->meshes, mesh);
+    modelData->vertexCount += assimpMesh->mNumVertices;
+    modelData->indexCount += assimpMesh->mNumFaces * 3;
+    modelData->hasNormals |= assimpMesh->mNormals != NULL;
+    modelData->hasUVs |= assimpMesh->mTextureCoords[0] != NULL;
+  }
 
-    // Faces
-    vec_init(&mesh->faces);
-    for (unsigned int f = 0; f < assimpMesh->mNumFaces; f++) {
-      struct aiFace assimpFace = assimpMesh->mFaces[f];
+  // Allocate
+  modelData->vertexSize = 3 + (modelData->hasNormals ? 3 : 0) + (modelData->hasUVs ? 2 : 0);
+  modelData->vertexData = malloc(modelData->vertexSize * modelData->vertexCount * sizeof(float));
+  modelData->indexData = malloc(modelData->indexCount * sizeof(uint32_t));
 
-      // Skip lines and points, polygons are triangulated
-      if (assimpFace.mNumIndices != 3) {
-        continue;
-      }
-
-      ModelFace face;
-      for (unsigned int i = 0; i < assimpFace.mNumIndices; i++) {
-        face.indices[i] = assimpFace.mIndices[i];
-      }
-      vec_push(&mesh->faces, face);
-    }
+  // Load
+  int vertex = 0;
+  int index = 0;
+  for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
+    struct aiMesh* assimpMesh = scene->mMeshes[m];
 
     // Vertices
-    vec_init(&mesh->vertices);
     for (unsigned int v = 0; v < assimpMesh->mNumVertices; v++) {
-      ModelVertex vertex;
-      vertex.x = assimpMesh->mVertices[v].x;
-      vertex.y = assimpMesh->mVertices[v].y;
-      vertex.z = assimpMesh->mVertices[v].z;
-      vec_push(&mesh->vertices, vertex);
+      modelData->vertexData[vertex++] = assimpMesh->mVertices[v].x;
+      modelData->vertexData[vertex++] = assimpMesh->mVertices[v].y;
+      modelData->vertexData[vertex++] = assimpMesh->mVertices[v].z;
+
+      if (modelData->hasNormals) {
+        if (assimpMesh->mNormals) {
+          modelData->vertexData[vertex++] = assimpMesh->mNormals[v].x;
+          modelData->vertexData[vertex++] = assimpMesh->mNormals[v].y;
+          modelData->vertexData[vertex++] = assimpMesh->mNormals[v].z;
+        } else {
+          modelData->vertexData[vertex++] = 0;
+          modelData->vertexData[vertex++] = 0;
+          modelData->vertexData[vertex++] = 0;
+        }
+      }
+
+      if (modelData->hasUVs) {
+        if (assimpMesh->mTextureCoords[0]) {
+          modelData->vertexData[vertex++] = assimpMesh->mTextureCoords[0][v].x;
+          modelData->vertexData[vertex++] = assimpMesh->mTextureCoords[0][v].y;
+        } else {
+          modelData->vertexData[vertex++] = 0;
+          modelData->vertexData[vertex++] = 0;
+        }
+      }
     }
 
-    // Normals
-    lovrAssert(assimpMesh->mNormals, "Model must have normals");
+    // Indices
+    for (unsigned int f = 0; f < assimpMesh->mNumFaces; f++) {
+      struct aiFace assimpFace = assimpMesh->mFaces[f];
+      lovrAssert(assimpFace.mNumIndices == 3, "Only triangular faces are supported");
 
-    modelData->hasNormals = 1;
-    vec_init(&mesh->normals);
-    for (unsigned int n = 0; n < assimpMesh->mNumVertices; n++) {
-      ModelVertex normal;
-      normal.x = assimpMesh->mNormals[n].x;
-      normal.y = assimpMesh->mNormals[n].y;
-      normal.z = assimpMesh->mNormals[n].z;
-      vec_push(&mesh->normals, normal);
-    }
-
-    modelData->hasTexCoords = modelData->hasTexCoords || assimpMesh->mTextureCoords[0] != NULL;
-    if (assimpMesh->mTextureCoords[0]) {
-      vec_init(&mesh->texCoords);
-      for (unsigned int i = 0; i < assimpMesh->mNumVertices; i++) {
-        ModelVertex texCoord;
-        texCoord.x = assimpMesh->mTextureCoords[0][i].x;
-        texCoord.y = assimpMesh->mTextureCoords[0][i].y;
-        vec_push(&mesh->texCoords, texCoord);
+      for (unsigned int i = 0; i < assimpFace.mNumIndices; i++) {
+        modelData->indexData[index++] = assimpFace.mIndices[i];
       }
     }
   }
 
   // Nodes
   modelData->root = malloc(sizeof(ModelNode));
+  modelData->root->parent = NULL;
   assimpNodeTraversal(modelData->root, scene->mRootNode);
 
   aiReleaseImport(scene);
@@ -103,30 +104,23 @@ ModelData* lovrModelDataCreate(Blob* blob) {
 }
 
 void lovrModelDataDestroy(ModelData* modelData) {
-  for (int i = 0; i < modelData->meshes.length; i++) {
-    ModelMesh* mesh = modelData->meshes.data[i];
-    vec_deinit(&mesh->faces);
-    vec_deinit(&mesh->vertices);
-    vec_deinit(&mesh->normals);
-    if (modelData->hasTexCoords) {
-      vec_deinit(&mesh->texCoords);
-    }
-    free(mesh);
-  }
+  free(modelData->vertexData);
+  free(modelData->indexData);
 
   vec_void_t nodes;
   vec_init(&nodes);
   vec_push(&nodes, modelData->root);
   while (nodes.length > 0) {
     ModelNode* node = vec_first(&nodes);
-    vec_extend(&nodes, &node->children);
-    vec_deinit(&node->meshes);
-    vec_deinit(&node->children);
+    vec_pusharr(&nodes, &node->children, node->childCount);
+    for (int i = 0; i < node->primitiveCount; i++) {
+      free(node->primitives[i]);
+    }
+    free(node->primitives);
     vec_splice(&nodes, 0, 1);
     free(node);
   }
-
-  vec_deinit(&modelData->meshes);
   vec_deinit(&nodes);
+
   free(modelData);
 }

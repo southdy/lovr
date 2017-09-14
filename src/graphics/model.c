@@ -5,66 +5,6 @@
 #include <stdlib.h>
 #include <float.h>
 
-static void visitNode(Model* model, ModelData* modelData, ModelNode* node, mat4 transform, vec_float_t* vertices, vec_uint_t* indices) {
-  float newTransform[16];
-
-  if (transform) {
-    mat4_set(newTransform, transform);
-  } else {
-    mat4_identity(newTransform);
-  }
-
-  mat4_multiply(newTransform, node->transform);
-
-  int indexOffset = vertices->length / 3;
-
-  // Meshes
-  for (int m = 0; m < node->meshes.length; m++) {
-    ModelMesh* mesh = modelData->meshes.data[node->meshes.data[m]];
-
-    // Transformed vertices
-    for (int v = 0; v < mesh->vertices.length; v++) {
-      ModelVertex vertex = mesh->vertices.data[v];
-
-      float vec[3] = { vertex.x, vertex.y, vertex.z };
-      mat4_transform(newTransform, vec);
-      vec_pusharr(vertices, vec, 3);
-
-      model->aabb[0] = MIN(model->aabb[0], vec[0]);
-      model->aabb[1] = MAX(model->aabb[1], vec[0]);
-      model->aabb[2] = MIN(model->aabb[2], vec[1]);
-      model->aabb[3] = MAX(model->aabb[3], vec[1]);
-      model->aabb[4] = MIN(model->aabb[4], vec[2]);
-      model->aabb[5] = MAX(model->aabb[5], vec[2]);
-
-      if (modelData->hasNormals) {
-        ModelVertex normal = mesh->normals.data[v];
-        vec_push(vertices, normal.x);
-        vec_push(vertices, normal.y);
-        vec_push(vertices, normal.z);
-      }
-
-      if (modelData->hasTexCoords) {
-        ModelVertex texCoord = mesh->texCoords.data[v];
-        vec_push(vertices, texCoord.x);
-        vec_push(vertices, texCoord.y);
-      }
-    }
-
-    // Face vertex indices
-    for (int f = 0; f < mesh->faces.length; f++) {
-      ModelFace face = mesh->faces.data[f];
-      vec_push(indices, face.indices[0] + indexOffset);
-      vec_push(indices, face.indices[1] + indexOffset);
-      vec_push(indices, face.indices[2] + indexOffset);
-    }
-  }
-
-  for (int c = 0; c < node->children.length; c++) {
-    visitNode(model, modelData, node->children.data[c], newTransform, vertices, indices);
-  }
-}
-
 Model* lovrModelCreate(ModelData* modelData) {
   Model* model = lovrAlloc(sizeof(Model), lovrModelDestroy);
   if (!model) return NULL;
@@ -77,44 +17,30 @@ Model* lovrModelCreate(ModelData* modelData) {
   model->aabb[4] = FLT_MAX;
   model->aabb[5] = FLT_MIN;
 
-  vec_float_t vertices;
-  vec_init(&vertices);
-
-  vec_uint_t indices;
-  vec_init(&indices);
-
-  visitNode(model, modelData, modelData->root, NULL, &vertices, &indices);
-
   MeshFormat format;
   vec_init(&format);
-
-  int components = 3;
-  MeshAttribute position = { .name = "lovrPosition", .type = MESH_FLOAT, .count = 3 };
-  vec_push(&format, position);
+  MeshAttribute attribute = { .name = "lovrPosition", .type = MESH_FLOAT, .count = 3 };
+  vec_push(&format, attribute);
 
   if (modelData->hasNormals) {
-    MeshAttribute normal = { .name = "lovrNormal", .type = MESH_FLOAT, .count = 3 };
-    vec_push(&format, normal);
-    components += 3;
+    MeshAttribute attribute = { .name = "lovrNormal", .type = MESH_FLOAT, .count = 3 };
+    vec_push(&format, attribute);
   }
 
-  if (modelData->hasTexCoords) {
-    MeshAttribute texCoord = { .name = "lovrTexCoord", .type = MESH_FLOAT, .count = 2 };
-    vec_push(&format, texCoord);
-    components += 2;
+  if (modelData->hasUVs) {
+    MeshAttribute attribute = { .name = "lovrTexCoord", .type = MESH_FLOAT, .count = 2 };
+    vec_push(&format, attribute);
   }
 
-  model->mesh = lovrMeshCreate(vertices.length / components, &format, MESH_TRIANGLES, MESH_STATIC);
-  void* data = lovrMeshMap(model->mesh, 0, vertices.length / components, 0, 1);
-  memcpy(data, vertices.data, vertices.length * sizeof(float));
+  model->mesh = lovrMeshCreate(modelData->vertexCount, &format, MESH_TRIANGLES, MESH_STATIC);
+  void* data = lovrMeshMap(model->mesh, 0, modelData->vertexCount, 0, 1);
+  memcpy(data, modelData->vertexData, modelData->vertexCount * modelData->vertexSize * sizeof(float));
   lovrMeshUnmap(model->mesh);
-  lovrMeshSetVertexMap(model->mesh, indices.data, indices.length);
+  lovrMeshSetVertexMap(model->mesh, modelData->indexData, modelData->indexCount);
 
   model->texture = NULL;
 
   vec_deinit(&format);
-  vec_deinit(&vertices);
-  vec_deinit(&indices);
   return model;
 }
 
