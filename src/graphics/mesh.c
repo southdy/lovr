@@ -132,7 +132,8 @@ void lovrMeshDraw(Mesh* mesh, mat4 transform) {
   size_t start = mesh->rangeStart;
   size_t count = mesh->rangeCount;
   if (mesh->map.length > 0) {
-    glDrawElements(mesh->drawMode, mesh->map.length, GL_UNSIGNED_INT, (GLvoid*) start);
+    count = mesh->isRangeEnabled ? mesh->rangeCount : mesh->map.length;
+    glDrawElements(mesh->drawMode, count, GL_UNSIGNED_INT, (GLvoid*) start);
   } else {
     glDrawArrays(mesh->drawMode, start, count);
   }
@@ -230,7 +231,9 @@ void lovrMeshGetDrawRange(Mesh* mesh, int* start, int* count) {
 }
 
 int lovrMeshSetDrawRange(Mesh* mesh, int start, int count) {
-  if (start < 0 || count < 0 || (size_t) start + count > mesh->count) {
+  size_t limit = mesh->map.length > 0 ? mesh->map.length : mesh->count;
+
+  if (start < 0 || count < 0 || (size_t) start + count > limit) {
     return 1;
   }
 

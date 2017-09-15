@@ -56,6 +56,7 @@ Model* lovrModelCreate(ModelData* modelData) {
   memcpy(data, modelData->vertices, modelData->vertexCount * modelData->vertexSize * sizeof(float));
   lovrMeshUnmap(model->mesh);
   lovrMeshSetVertexMap(model->mesh, modelData->indices, modelData->indexCount);
+  lovrMeshSetRangeEnabled(model->mesh, 1);
 
   model->texture = NULL;
 

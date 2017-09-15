@@ -2,6 +2,7 @@
 #include "math/mat4.h"
 #include <stdlib.h>
 #include <assimp/scene.h>
+#include <assimp/config.h>
 #include <assimp/cimport.h>
 #include <assimp/postprocess.h>
 
@@ -40,8 +41,11 @@ ModelData* lovrModelDataCreate(Blob* blob) {
   ModelData* modelData = malloc(sizeof(ModelData));
   if (!modelData) return NULL;
 
-  unsigned int flags = aiProcessPreset_TargetRealtime_MaxQuality | aiProcess_OptimizeGraph | aiProcess_FlipUVs;
-  const struct aiScene* scene = aiImportFileFromMemory(blob->data, blob->size, flags, NULL);
+  struct aiPropertyStore* propertyStore = aiCreatePropertyStore();
+  aiSetImportPropertyInteger(propertyStore, AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_POINT | aiPrimitiveType_LINE);
+  unsigned int flags = aiProcessPreset_TargetRealtime_MaxQuality | aiProcess_OptimizeGraph | aiProcess_SortByPType | aiProcess_FlipUVs;
+  const struct aiScene* scene = aiImportFileFromMemoryWithProperties(blob->data, blob->size, flags, NULL, propertyStore);
+  aiReleasePropertyStore(propertyStore);
 
   modelData->nodeCount = 0;
   modelData->vertexCount = 0;
@@ -69,9 +73,6 @@ ModelData* lovrModelDataCreate(Blob* blob) {
   int index = 0;
   for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
     struct aiMesh* assimpMesh = scene->mMeshes[m];
-
-    modelData->primitives[m].drawStart = vertex;
-    modelData->primitives[m].drawCount = assimpMesh->mNumVertices;
 
     // Vertices
     for (unsigned int v = 0; v < assimpMesh->mNumVertices; v++) {
@@ -102,10 +103,15 @@ ModelData* lovrModelDataCreate(Blob* blob) {
       }
     }
 
+    modelData->primitives[m].drawStart = index;
+    modelData->primitives[m].drawCount = 0;
+
     // Indices
     for (unsigned int f = 0; f < assimpMesh->mNumFaces; f++) {
       struct aiFace assimpFace = assimpMesh->mFaces[f];
       lovrAssert(assimpFace.mNumIndices == 3, "Only triangular faces are supported");
+
+      modelData->primitives[m].drawCount += assimpFace.mNumIndices;
 
       for (unsigned int i = 0; i < assimpFace.mNumIndices; i++) {
         modelData->indices[index++] = assimpFace.mIndices[i];
