@@ -8,15 +8,20 @@
 static void renderNode(Model* model, int nodeIndex) {
   ModelNode* node = &model->modelData->nodes[nodeIndex];
 
+  lovrGraphicsPush();
+  lovrGraphicsMatrixTransform(MATRIX_MODEL, node->transform);
+
   for (int i = 0; i < node->primitives.length; i++) {
     ModelPrimitive* primitive = &model->modelData->primitives[node->primitives.data[i]];
     lovrMeshSetDrawRange(model->mesh, primitive->drawStart, primitive->drawCount);
-    lovrMeshDraw(model->mesh, node->transform);
+    lovrMeshDraw(model->mesh, NULL);
   }
 
   for (int i = 0; i < node->children.length; i++) {
     renderNode(model, node->children.data[i]);
   }
+
+  lovrGraphicsPop();
 }
 
 Model* lovrModelCreate(ModelData* modelData) {

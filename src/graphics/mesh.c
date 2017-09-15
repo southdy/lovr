@@ -119,8 +119,11 @@ void lovrMeshDraw(Mesh* mesh, mat4 transform) {
     lovrMeshUnmap(mesh);
   }
 
-  lovrGraphicsPush();
-  lovrGraphicsMatrixTransform(MATRIX_MODEL, transform);
+  if (transform) {
+    lovrGraphicsPush();
+    lovrGraphicsMatrixTransform(MATRIX_MODEL, transform);
+  }
+
   lovrGraphicsBindTexture(mesh->texture);
   lovrGraphicsSetDefaultShader(SHADER_DEFAULT);
   lovrGraphicsPrepare();
@@ -133,7 +136,10 @@ void lovrMeshDraw(Mesh* mesh, mat4 transform) {
   } else {
     glDrawArrays(mesh->drawMode, start, count);
   }
-  lovrGraphicsPop();
+
+  if (transform) {
+    lovrGraphicsPop();
+  }
 }
 
 MeshFormat lovrMeshGetVertexFormat(Mesh* mesh) {
