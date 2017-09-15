@@ -5,6 +5,20 @@
 #include <stdlib.h>
 #include <float.h>
 
+static void renderNode(Model* model, int nodeIndex) {
+  ModelNode* node = &model->modelData->nodes[nodeIndex];
+
+  for (int i = 0; i < node->primitives.length; i++) {
+    ModelPrimitive* primitive = &model->modelData->primitives[node->primitives.data[i]];
+    lovrMeshSetDrawRange(model->mesh, primitive->drawStart, primitive->drawCount);
+    lovrMeshDraw(model->mesh, node->transform);
+  }
+
+  for (int i = 0; i < node->children.length; i++) {
+    renderNode(model, node->children.data[i]);
+  }
+}
+
 Model* lovrModelCreate(ModelData* modelData) {
   Model* model = lovrAlloc(sizeof(Model), lovrModelDestroy);
   if (!model) return NULL;
@@ -34,9 +48,9 @@ Model* lovrModelCreate(ModelData* modelData) {
 
   model->mesh = lovrMeshCreate(modelData->vertexCount, &format, MESH_TRIANGLES, MESH_STATIC);
   void* data = lovrMeshMap(model->mesh, 0, modelData->vertexCount, 0, 1);
-  memcpy(data, modelData->vertexData, modelData->vertexCount * modelData->vertexSize * sizeof(float));
+  memcpy(data, modelData->vertices, modelData->vertexCount * modelData->vertexSize * sizeof(float));
   lovrMeshUnmap(model->mesh);
-  lovrMeshSetVertexMap(model->mesh, modelData->indexData, modelData->indexCount);
+  lovrMeshSetVertexMap(model->mesh, modelData->indices, modelData->indexCount);
 
   model->texture = NULL;
 
@@ -55,7 +69,14 @@ void lovrModelDestroy(const Ref* ref) {
 }
 
 void lovrModelDraw(Model* model, mat4 transform) {
-  lovrMeshDraw(model->mesh, transform);
+  if (model->modelData->nodeCount == 0) {
+    return;
+  }
+
+  lovrGraphicsPush();
+  lovrGraphicsMatrixTransform(MATRIX_MODEL, transform);
+  renderNode(model, 0);
+  lovrGraphicsPop();
 }
 
 Texture* lovrModelGetTexture(Model* model) {

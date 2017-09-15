@@ -12,20 +12,21 @@ typedef struct {
 
 typedef struct ModelNode {
   float transform[16];
-  struct ModelNode* parent;
-  struct ModelNode** children;
-  int childCount;
-  ModelPrimitive** primitives;
-  int primitiveCount;
+  int parent;
+  vec_uint_t children;
+  vec_uint_t primitives;
 } ModelNode;
 
 typedef struct {
-  ModelNode* root;
-  float* vertexData;
+  ModelNode* nodes;
+  ModelPrimitive* primitives;
+  float* vertices;
+  uint32_t* indices;
+  int nodeCount;
+  int primitiveCount;
   int vertexSize;
-  uint32_t vertexCount;
-  uint32_t* indexData;
-  uint32_t indexCount;
+  int vertexCount;
+  int indexCount;
   int hasNormals;
   int hasUVs;
 } ModelData;

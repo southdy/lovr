@@ -601,12 +601,12 @@ ModelData* lovrHeadsetControllerNewModelData(Controller* controller) {
   if (!modelData) return NULL;
 
   modelData->indexCount = vrModel->unTriangleCount;
-  modelData->indexData = malloc(modelData->indexCount * sizeof(unsigned int));
-  memcpy(modelData->indexData, vrModel->rIndexData, modelData->indexCount * sizeof(unsigned int));
+  modelData->indices = malloc(modelData->indexCount * sizeof(unsigned int));
+  memcpy(modelData->indices, vrModel->rIndexData, modelData->indexCount * sizeof(unsigned int));
 
   modelData->vertexCount = vrModel->unVertexCount;
   modelData->vertexSize = 8;
-  modelData->vertexData = malloc(modelData->vertexCount * modelData->vertexSize * sizeof(float));
+  modelData->vertices = malloc(modelData->vertexCount * modelData->vertexSize * sizeof(float));
 
   int vertex = 0;
   for (size_t i = 0; i < vrModel->unVertexCount; i++) {
@@ -614,29 +614,33 @@ ModelData* lovrHeadsetControllerNewModelData(Controller* controller) {
     float* normal = vrModel->rVertexData[i].vNormal.v;
     float* texCoords = vrModel->rVertexData[i].rfTextureCoord;
 
-    modelData->vertexData[vertex++] = position[0];
-    modelData->vertexData[vertex++] = position[1];
-    modelData->vertexData[vertex++] = position[2];
+    modelData->vertices[vertex++] = position[0];
+    modelData->vertices[vertex++] = position[1];
+    modelData->vertices[vertex++] = position[2];
 
-    modelData->vertexData[vertex++] = normal[0];
-    modelData->vertexData[vertex++] = normal[1];
-    modelData->vertexData[vertex++] = normal[2];
+    modelData->vertices[vertex++] = normal[0];
+    modelData->vertices[vertex++] = normal[1];
+    modelData->vertices[vertex++] = normal[2];
 
-    modelData->vertexData[vertex++] = texCoords[0];
-    modelData->vertexData[vertex++] = texCoords[1];
+    modelData->vertices[vertex++] = texCoords[0];
+    modelData->vertices[vertex++] = texCoords[1];
   }
 
-  ModelNode* root = malloc(sizeof(ModelNode));
-  mat4_identity(root->transform);
-  root->parent = NULL;
-  root->childCount = 0;
-  root->primitiveCount = 1;
-  root->primitives = malloc(root->primitiveCount * sizeof(ModelPrimitive*));
-  root->primitives[0] = malloc(sizeof(ModelPrimitive));
-  root->primitives[0]->drawStart = 0;
-  root->primitives[0]->drawCount = modelData->vertexCount;
+  modelData->nodeCount = 1;
+  modelData->primitiveCount = 1;
 
-  modelData->root = root;
+  modelData->nodes = malloc(sizeof(ModelNode));
+  modelData->primitives = malloc(sizeof(ModelPrimitive));
+
+  ModelNode* root = &modelData->nodes[0];
+  root->parent = -1;
+  mat4_identity(root->transform);
+  vec_init(&root->children);
+  vec_init(&root->primitives);
+  vec_push(&root->primitives, 0);
+  modelData->primitives[0].drawStart = 0;
+  modelData->primitives[0].drawCount = modelData->vertexCount;
+
   modelData->hasNormals = 1;
   modelData->hasUVs = 1;
 
