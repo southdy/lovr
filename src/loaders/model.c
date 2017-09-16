@@ -43,7 +43,7 @@ ModelData* lovrModelDataCreate(Blob* blob) {
 
   struct aiPropertyStore* propertyStore = aiCreatePropertyStore();
   aiSetImportPropertyInteger(propertyStore, AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_POINT | aiPrimitiveType_LINE);
-  unsigned int flags = aiProcessPreset_TargetRealtime_MaxQuality | aiProcess_OptimizeGraph | aiProcess_SortByPType | aiProcess_FlipUVs;
+  unsigned int flags = aiProcessPreset_TargetRealtime_MaxQuality | aiProcess_OptimizeGraph | aiProcess_FlipUVs;
   const struct aiScene* scene = aiImportFileFromMemoryWithProperties(blob->data, blob->size, flags, NULL, propertyStore);
   aiReleasePropertyStore(propertyStore);
 
@@ -74,6 +74,21 @@ ModelData* lovrModelDataCreate(Blob* blob) {
   for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
     struct aiMesh* assimpMesh = scene->mMeshes[m];
 
+    modelData->primitives[m].drawStart = index;
+    modelData->primitives[m].drawCount = 0;
+
+    // Indices
+    for (unsigned int f = 0; f < assimpMesh->mNumFaces; f++) {
+      struct aiFace assimpFace = assimpMesh->mFaces[f];
+      lovrAssert(assimpFace.mNumIndices == 3, "Only triangular faces are supported");
+
+      modelData->primitives[m].drawCount += assimpFace.mNumIndices;
+
+      for (unsigned int i = 0; i < assimpFace.mNumIndices; i++) {
+        modelData->indices[index++] = (vertex / modelData->vertexSize) + assimpFace.mIndices[i];
+      }
+    }
+
     // Vertices
     for (unsigned int v = 0; v < assimpMesh->mNumVertices; v++) {
       modelData->vertices[vertex++] = assimpMesh->mVertices[v].x;
@@ -100,21 +115,6 @@ ModelData* lovrModelDataCreate(Blob* blob) {
           modelData->vertices[vertex++] = 0;
           modelData->vertices[vertex++] = 0;
         }
-      }
-    }
-
-    modelData->primitives[m].drawStart = index;
-    modelData->primitives[m].drawCount = 0;
-
-    // Indices
-    for (unsigned int f = 0; f < assimpMesh->mNumFaces; f++) {
-      struct aiFace assimpFace = assimpMesh->mFaces[f];
-      lovrAssert(assimpFace.mNumIndices == 3, "Only triangular faces are supported");
-
-      modelData->primitives[m].drawCount += assimpFace.mNumIndices;
-
-      for (unsigned int i = 0; i < assimpFace.mNumIndices; i++) {
-        modelData->indices[index++] = assimpFace.mIndices[i];
       }
     }
   }

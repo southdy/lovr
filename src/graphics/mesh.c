@@ -133,7 +133,7 @@ void lovrMeshDraw(Mesh* mesh, mat4 transform) {
   size_t count = mesh->rangeCount;
   if (mesh->map.length > 0) {
     count = mesh->isRangeEnabled ? mesh->rangeCount : mesh->map.length;
-    glDrawElements(mesh->drawMode, count, GL_UNSIGNED_INT, (GLvoid*) start);
+    glDrawElements(mesh->drawMode, count, GL_UNSIGNED_INT, (GLvoid*) (start * sizeof(unsigned int)));
   } else {
     glDrawArrays(mesh->drawMode, start, count);
   }
