@@ -84,11 +84,46 @@ void lovrGraphicsPrepare() {
     shader = state.defaultShaders[state.defaultShader] = lovrShaderCreateDefault(state.defaultShader);
   }
 
+  UniformValue value;
   mat4 model = state.transforms[state.transform][MATRIX_MODEL];
   mat4 view = state.transforms[state.transform][MATRIX_VIEW];
   mat4 projection = state.canvases[state.canvas].projection;
-  lovrGraphicsBindProgram(shader->id);
-  lovrShaderBind(shader, model, view, projection, state.color, 0);
+
+  value.floats = model;
+  lovrShaderUpdateUniform(shader, "lovrModel", value);
+
+  value.floats = view;
+  lovrShaderUpdateUniform(shader, "lovrView", value);
+
+  float transform[16];
+  mat4_multiply(mat4_set(transform, view), model);
+
+  value.floats = transform;
+  lovrShaderUpdateUniform(shader, "lovrTransform", value);
+
+  if (mat4_invert(transform)) {
+    mat4_transpose(transform);
+  } else {
+    mat4_identity(transform);
+  }
+
+  float normalMatrix[9] = {
+    transform[0], transform[1], transform[2],
+    transform[4], transform[5], transform[6],
+    transform[8], transform[9], transform[10]
+  };
+
+  value.floats = normalMatrix;
+  lovrShaderUpdateUniform(shader, "lovrNormalMatrix", value);
+
+  value.floats = projection;
+  lovrShaderUpdateUniform(shader, "lovrProjection", value);
+
+  float color[4] = { state.color.r / 255., state.color.g / 255., state.color.b / 255., state.color.a / 255. };
+  value.floats = color;
+  lovrShaderUpdateUniform(shader, "lovrColor", value);
+
+  lovrShaderBind(shader, 0);
 }
 
 void lovrGraphicsCreateWindow(int w, int h, int fullscreen, int msaa, const char* title, const char* icon) {

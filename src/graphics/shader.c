@@ -142,6 +142,67 @@ static GLuint linkShaders(GLuint vertexShader, GLuint fragmentShader) {
   return shader;
 }
 
+static UniformType getUniformType(GLenum type, const char* debug) {
+  switch (type) {
+    case GL_FLOAT:
+    case GL_FLOAT_VEC2:
+    case GL_FLOAT_VEC3:
+    case GL_FLOAT_VEC4:
+      return UNIFORM_FLOAT;
+
+    case GL_INT:
+    case GL_INT_VEC2:
+    case GL_INT_VEC3:
+    case GL_INT_VEC4:
+      return UNIFORM_INT;
+
+    case GL_FLOAT_MAT2:
+    case GL_FLOAT_MAT3:
+    case GL_FLOAT_MAT4:
+      return UNIFORM_MATRIX;
+
+    case GL_SAMPLER_1D:
+    case GL_SAMPLER_2D:
+    case GL_SAMPLER_3D:
+    case GL_SAMPLER_CUBE:
+      return UNIFORM_SAMPLER;
+
+    default:
+      lovrThrow("Unknown uniform type for uniform '%s'", debug);
+      return UNIFORM_FLOAT;
+  }
+}
+
+static int getUniformComponents(GLenum type) {
+  switch (type) {
+    case GL_FLOAT:
+    case GL_INT:
+    case GL_SAMPLER_1D:
+    case GL_SAMPLER_2D:
+    case GL_SAMPLER_3D:
+    case GL_SAMPLER_CUBE:
+      return 1;
+
+    case GL_FLOAT_VEC2:
+    case GL_INT_VEC2:
+    case GL_FLOAT_MAT2:
+      return 2;
+
+    case GL_FLOAT_VEC3:
+    case GL_INT_VEC3:
+    case GL_FLOAT_MAT3:
+      return 3;
+
+    case GL_FLOAT_VEC4:
+    case GL_INT_VEC4:
+    case GL_FLOAT_MAT4:
+      return 4;
+
+    default:
+      return 1;
+  }
+}
+
 Shader* lovrShaderCreate(const char* vertexSource, const char* fragmentSource) {
   Shader* shader = lovrAlloc(sizeof(Shader), lovrShaderDestroy);
   if (!shader) return NULL;
@@ -159,35 +220,62 @@ Shader* lovrShaderCreate(const char* vertexSource, const char* fragmentSource) {
   GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fullFragmentSource);
 
   // Link
-  GLuint id = linkShaders(vertexShader, fragmentShader);
+  GLuint program = linkShaders(vertexShader, fragmentShader);
+  lovrGraphicsBindProgram(program);
+  shader->program = program;
 
-  // Compute information about uniforms
+  // Store uniform info
   GLint uniformCount;
   GLsizei bufferSize = LOVR_MAX_UNIFORM_LENGTH / sizeof(GLchar);
   map_init(&shader->uniforms);
-  glGetProgramiv(id, GL_ACTIVE_UNIFORMS, &uniformCount);
+  glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &uniformCount);
   for (int i = 0; i < uniformCount; i++) {
     Uniform uniform;
-    glGetActiveUniform(id, i, bufferSize, NULL, &uniform.count, &uniform.type, uniform.name);
+    GLenum type;
+    glGetActiveUniform(program, i, bufferSize, NULL, &uniform.count, &type, uniform.name);
+
     char* subscript = strchr(uniform.name, '[');
     if (subscript) {
       *subscript = '\0';
     }
-    uniform.location = glGetUniformLocation(id, uniform.name);
+
     uniform.index = i;
+    uniform.location = glGetUniformLocation(program, uniform.name);
+    uniform.type = getUniformType(type, uniform.name);
+    uniform.components = getUniformComponents(type);
+    uniform.dirty = 1;
+
+    switch (uniform.type) {
+      case UNIFORM_FLOAT:
+        uniform.size = uniform.components * uniform.count * sizeof(float);
+        uniform.value.data = malloc(uniform.size);
+        break;
+
+      case UNIFORM_INT:
+      case UNIFORM_SAMPLER:
+        uniform.size = uniform.components * uniform.count * sizeof(int);
+        uniform.value.data = malloc(uniform.size);
+        break;
+
+      case UNIFORM_MATRIX:
+        uniform.size = uniform.components * uniform.components * uniform.count * sizeof(int);
+        uniform.value.data = malloc(uniform.size);
+        break;
+    }
+
+    memset(uniform.value.data, 0, uniform.size);
+
+    if (uniform.type == UNIFORM_MATRIX) {
+      for (int j = 0; j < uniform.components; j++) {
+        int index = j * uniform.components + j;
+        uniform.value.floats[index] = 1.;
+      }
+    }
+
     map_set(&shader->uniforms, uniform.name, uniform);
   }
 
-  // Initial state
-  shader->id = id;
-  mat4_identity(shader->model);
-  mat4_identity(shader->view);
-  mat4_identity(shader->projection);
-  shader->color = (Color) { 0, 0, 0, 0 };
-
-  // Send initial uniform values to shader
-  lovrGraphicsBindProgram(id);
-  lovrShaderBind(shader, shader->model, shader->view, shader->projection, shader->color, 1);
+  lovrShaderBind(shader, 1);
 
   return shader;
 }
@@ -197,7 +285,11 @@ Shader* lovrShaderCreateDefault(DefaultShader type) {
     case SHADER_DEFAULT: return lovrShaderCreate(NULL, NULL);
     case SHADER_SKYBOX: {
       Shader* shader = lovrShaderCreate(lovrSkyboxVertexShader, lovrSkyboxFragmentShader);
-      lovrShaderSendInt(shader, lovrShaderGetUniformId(shader, "cube"), 1);
+      Uniform* uniform = map_get(&shader->uniforms, "cube");
+      if (uniform) {
+        uniform->value.ints[0] = 1;
+        lovrShaderUpdateUniform(shader, "cube", uniform->value);
+      }
       return shader;
     }
     case SHADER_FONT: return lovrShaderCreate(NULL, lovrFontFragmentShader);
@@ -208,69 +300,51 @@ Shader* lovrShaderCreateDefault(DefaultShader type) {
 
 void lovrShaderDestroy(const Ref* ref) {
   Shader* shader = containerof(ref, Shader);
-  glDeleteProgram(shader->id);
+  glDeleteProgram(shader->program);
   map_deinit(&shader->uniforms);
   free(shader);
 }
 
-void lovrShaderBind(Shader* shader, mat4 model, mat4 view, mat4 projection, Color color, int force) {
-  int dirtyModel = force || memcmp(shader->model, model, 16 * sizeof(float));
-  int dirtyView = force || memcmp(shader->view, view, 16 * sizeof(float));
-  int dirtyTransform = dirtyModel || dirtyView;
-  int dirtyProjection = force || memcmp(shader->projection, projection, 16 * sizeof(float));
-  int dirtyColor = force || memcmp(&shader->color, &color, 4 * sizeof(uint8_t));
+void lovrShaderBind(Shader* shader, int force) {
+  lovrGraphicsBindProgram(shader->program);
 
-  if (dirtyModel) {
-    int uniformId = lovrShaderGetUniformId(shader, "lovrModel");
-    lovrShaderSendFloatMat4(shader, uniformId, model);
-    memcpy(shader->model, model, 16 * sizeof(float));
-  }
+  const char* key;
+  map_iter_t iter = map_iter(&shader->uniforms);
+  while ((key = map_next(&shader->uniforms, &iter))) {
+    Uniform* uniform = map_get(&shader->uniforms, key);
 
-  if (dirtyView) {
-    int uniformId = lovrShaderGetUniformId(shader, "lovrView");
-    lovrShaderSendFloatMat4(shader, uniformId, view);
-    memcpy(shader->view, view, 16 * sizeof(float));
-  }
+    if (force || uniform->dirty) {
+      uniform->dirty = 0;
 
-  if (dirtyTransform) {
-    float matrix[16];
-    int uniformId = lovrShaderGetUniformId(shader, "lovrTransform");
+      switch (uniform->type) {
+        case UNIFORM_FLOAT:
+          switch (uniform->components) {
+            case 1: glUniform1fv(uniform->location, uniform->count, uniform->value.floats); break;
+            case 2: glUniform2fv(uniform->location, uniform->count, uniform->value.floats); break;
+            case 3: glUniform3fv(uniform->location, uniform->count, uniform->value.floats); break;
+            case 4: glUniform4fv(uniform->location, uniform->count, uniform->value.floats); break;
+          }
+          break;
 
-    mat4_multiply(mat4_set(matrix, view), model);
+        case UNIFORM_INT:
+        case UNIFORM_SAMPLER:
+          switch (uniform->components) {
+            case 1: glUniform1iv(uniform->location, uniform->count, uniform->value.ints); break;
+            case 2: glUniform2iv(uniform->location, uniform->count, uniform->value.ints); break;
+            case 3: glUniform3iv(uniform->location, uniform->count, uniform->value.ints); break;
+            case 4: glUniform4iv(uniform->location, uniform->count, uniform->value.ints); break;
+          }
+          break;
 
-		if (uniformId > -1) {
-			lovrShaderSendFloatMat4(shader, uniformId, matrix);
-		}
-
-    if (mat4_invert(matrix)) {
-      mat4_transpose(matrix);
-    } else {
-      mat4_identity(matrix);
+        case UNIFORM_MATRIX:
+          switch (uniform->components) {
+            case 2: glUniformMatrix2fv(uniform->location, uniform->count, GL_FALSE, uniform->value.floats); break;
+            case 3: glUniformMatrix3fv(uniform->location, uniform->count, GL_FALSE, uniform->value.floats); break;
+            case 4: glUniformMatrix4fv(uniform->location, uniform->count, GL_FALSE, uniform->value.floats); break;
+          }
+          break;
+      }
     }
-
-    float normalMatrix[9] = {
-      matrix[0], matrix[1], matrix[2],
-      matrix[4], matrix[5], matrix[6],
-      matrix[8], matrix[9], matrix[10]
-    };
-
-    uniformId = lovrShaderGetUniformId(shader, "lovrNormalMatrix");
-		if (uniformId > -1) {
-			lovrShaderSendFloatMat3(shader, uniformId, normalMatrix);
-		}
-  }
-
-  if (dirtyProjection) {
-    int uniformId = lovrShaderGetUniformId(shader, "lovrProjection");
-    lovrShaderSendFloatMat4(shader, uniformId, projection);
-    memcpy(shader->projection, projection, 16 * sizeof(float));
-  }
-
-  if (dirtyColor) {
-    int uniformId = lovrShaderGetUniformId(shader, "lovrColor");
-    float c[4] = { color.r / 255., color.g / 255., color.b / 255., color.a / 255. };
-    lovrShaderSendFloatVec4(shader, uniformId, 1, c);
-    shader->color = color;
   }
 }
 
@@ -279,54 +353,17 @@ int lovrShaderGetAttributeId(Shader* shader, const char* name) {
     return -1;
   }
 
-  return glGetAttribLocation(shader->id, name);
+  return glGetAttribLocation(shader->program, name);
 }
 
-int lovrShaderGetUniformId(Shader* shader, const char* name) {
-  Uniform* uniform = map_get(&shader->uniforms, name);
-  return uniform ? uniform->location : -1;
+Uniform* lovrShaderGetUniform(Shader* shader, const char* name) {
+  return map_get(&shader->uniforms, name);
 }
 
-int lovrShaderGetUniformType(Shader* shader, const char* name, GLenum* type, int* count) {
+void lovrShaderUpdateUniform(Shader* shader, const char* name, UniformValue value) {
   Uniform* uniform = map_get(&shader->uniforms, name);
-
-  if (!uniform) {
-    return 1;
+  if (uniform && memcmp(uniform->value.data, value.data, uniform->size)) {
+    memcpy(uniform->value.data, value.data, uniform->size);
+    uniform->dirty = 1;
   }
-
-  *type = uniform->type;
-  *count = uniform->count;
-  return 0;
-}
-
-void lovrShaderSendInt(Shader* shader, int id, int value) {
-  glUniform1i(id, value);
-}
-
-void lovrShaderSendFloat(Shader* shader, int id, float value) {
-  glUniform1f(id, value);
-}
-
-void lovrShaderSendFloatVec2(Shader* shader, int id, int count, float* vector) {
-  glUniform2fv(id, count, vector);
-}
-
-void lovrShaderSendFloatVec3(Shader* shader, int id, int count, float* vector) {
-  glUniform3fv(id, count, vector);
-}
-
-void lovrShaderSendFloatVec4(Shader* shader, int id, int count, float* vector) {
-  glUniform4fv(id, count, vector);
-}
-
-void lovrShaderSendFloatMat2(Shader* shader, int id, float* matrix) {
-  glUniformMatrix2fv(id, 1, GL_FALSE, matrix);
-}
-
-void lovrShaderSendFloatMat3(Shader* shader, int id, float* matrix) {
-  glUniformMatrix3fv(id, 1, GL_FALSE, matrix);
-}
-
-void lovrShaderSendFloatMat4(Shader* shader, int id, float* matrix) {
-  glUniformMatrix4fv(id, 1, GL_FALSE, matrix);
 }

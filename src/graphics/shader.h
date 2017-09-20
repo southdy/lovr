@@ -1,3 +1,4 @@
+#include "graphics/texture.h"
 #include "math/math.h"
 #include "lib/map/map.h"
 #include "lib/glfw.h"
@@ -17,38 +18,44 @@ typedef enum {
   SHADER_FULLSCREEN
 } DefaultShader;
 
+typedef enum {
+  UNIFORM_FLOAT,
+  UNIFORM_MATRIX,
+  UNIFORM_INT,
+  UNIFORM_SAMPLER
+} UniformType;
+
+typedef union {
+  void* data;
+  float* floats;
+  int* ints;
+} UniformValue;
+
 typedef struct {
   GLchar name[LOVR_MAX_UNIFORM_LENGTH];
   int index;
   int location;
-  GLenum type;
+  UniformType type;
+  int components;
   int count;
+  size_t size;
+  UniformValue value;
+  int dirty;
 } Uniform;
 
+typedef map_t(UniformValue) map_uniform_value_t;
 typedef map_t(Uniform) map_uniform_t;
 
 typedef struct {
   Ref ref;
-  int id;
+  uint32_t program;
   map_uniform_t uniforms;
-  float model[16];
-  float view[16];
-  float projection[16];
-  Color color;
 } Shader;
 
 Shader* lovrShaderCreate(const char* vertexSource, const char* fragmentSource);
 Shader* lovrShaderCreateDefault(DefaultShader type);
 void lovrShaderDestroy(const Ref* ref);
-void lovrShaderBind(Shader* shader, mat4 model, mat4 view, mat4 projection, Color color, int force);
+void lovrShaderBind(Shader* shader, int force);
 int lovrShaderGetAttributeId(Shader* shader, const char* name);
-int lovrShaderGetUniformId(Shader* shader, const char* name);
-int lovrShaderGetUniformType(Shader* shader, const char* name, GLenum* type, int* count);
-void lovrShaderSendInt(Shader* shader, int id, int value);
-void lovrShaderSendFloat(Shader* shader, int id, float value);
-void lovrShaderSendFloatVec2(Shader* shader, int id, int count, float* vector);
-void lovrShaderSendFloatVec3(Shader* shader, int id, int count,float* vector);
-void lovrShaderSendFloatVec4(Shader* shader, int id, int count, float* vector);
-void lovrShaderSendFloatMat2(Shader* shader, int id, float* matrix);
-void lovrShaderSendFloatMat3(Shader* shader, int id, float* matrix);
-void lovrShaderSendFloatMat4(Shader* shader, int id, float* matrix);
+Uniform* lovrShaderGetUniform(Shader* shader, const char* name);
+void lovrShaderUpdateUniform(Shader* shader, const char* name, UniformValue value);
