@@ -95,26 +95,34 @@ void lovrGraphicsPrepare() {
   value.floats = view;
   lovrShaderUpdateUniform(shader, "lovrView", value);
 
-  float transform[16];
-  mat4_multiply(mat4_set(transform, view), model);
+  int hasTransform = lovrShaderGetUniform(shader, "lovrTransform") != NULL;
+  int hasNormalMatrix = lovrShaderGetUniform(shader, "lovrNormalMatrix") != NULL;
+  if (hasTransform || hasNormalMatrix) {
+    float transform[16];
+    mat4_multiply(mat4_set(transform, view), model);
 
-  value.floats = transform;
-  lovrShaderUpdateUniform(shader, "lovrTransform", value);
+    if (hasTransform) {
+      value.floats = transform;
+      lovrShaderUpdateUniform(shader, "lovrTransform", value);
+    }
 
-  if (mat4_invert(transform)) {
-    mat4_transpose(transform);
-  } else {
-    mat4_identity(transform);
+    if (hasNormalMatrix) {
+      if (mat4_invert(transform)) {
+        mat4_transpose(transform);
+      } else {
+        mat4_identity(transform);
+      }
+
+      float normalMatrix[9] = {
+        transform[0], transform[1], transform[2],
+        transform[4], transform[5], transform[6],
+        transform[8], transform[9], transform[10]
+      };
+
+      value.floats = normalMatrix;
+      lovrShaderUpdateUniform(shader, "lovrNormalMatrix", value);
+    }
   }
-
-  float normalMatrix[9] = {
-    transform[0], transform[1], transform[2],
-    transform[4], transform[5], transform[6],
-    transform[8], transform[9], transform[10]
-  };
-
-  value.floats = normalMatrix;
-  lovrShaderUpdateUniform(shader, "lovrNormalMatrix", value);
 
   value.floats = projection;
   lovrShaderUpdateUniform(shader, "lovrProjection", value);
