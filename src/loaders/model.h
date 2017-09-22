@@ -4,8 +4,30 @@
 
 #pragma once
 
+typedef enum {
+  PROPERTY_FLOAT,
+  PROPERTY_COLOR,
+  PROPERTY_TEXTURE
+} MaterialPropertyType;
+
 typedef struct {
-  // material
+  char name[100];
+  MaterialPropertyType type;
+  union {
+    void* data;
+    float* floats;
+    int* ints;
+  } value;
+} ModelMaterial;
+
+typedef vec_t(MaterialProperty) vec_material_property_t;
+
+typedef struct {
+  vec_material_property_t properties;
+} ModelMaterial;
+
+typedef struct {
+  int material;
   int drawStart;
   int drawCount;
 } ModelPrimitive;
@@ -20,10 +42,12 @@ typedef struct ModelNode {
 typedef struct {
   ModelNode* nodes;
   ModelPrimitive* primitives;
+  ModelMaterial* materials;
   float* vertices;
   uint32_t* indices;
   int nodeCount;
   int primitiveCount;
+  int materialCount;
   int vertexSize;
   int vertexCount;
   int indexCount;
