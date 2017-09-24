@@ -11,8 +11,25 @@ static void renderNode(Model* model, int nodeIndex) {
   lovrGraphicsPush();
   lovrGraphicsMatrixTransform(MATRIX_MODEL, node->transform);
 
+  Shader* shader = lovrGraphicsGetActiveShader();
+
   for (int i = 0; i < node->primitives.length; i++) {
     ModelPrimitive* primitive = &model->modelData->primitives[node->primitives.data[i]];
+    ModelMaterial* material = &model->modelData->materials[primitive->material];
+
+    if (shader) {
+      const char* key;
+      UniformValue value;
+      map_iter_t iter = map_iter(material);
+      while ((key = map_next(material, &iter))) {
+        if (lovrShaderGetUniform(shader, key)) {
+          MaterialProperty* property = map_get(material, key);
+          value.data = property->value;
+          lovrShaderUpdateUniform(shader, key, value);
+        }
+      }
+    }
+
     lovrMeshSetDrawRange(model->mesh, primitive->drawStart, primitive->drawCount);
     lovrMeshDraw(model->mesh, NULL);
   }

@@ -1,5 +1,6 @@
 #include "filesystem/blob.h"
 #include "util.h"
+#include "lib/map/map.h"
 #include "lib/vec/vec.h"
 
 #pragma once
@@ -11,20 +12,11 @@ typedef enum {
 } MaterialPropertyType;
 
 typedef struct {
-  char name[100];
   MaterialPropertyType type;
-  union {
-    void* data;
-    float* floats;
-    int* ints;
-  } value;
-} ModelMaterial;
+  void* value;
+} MaterialProperty;
 
-typedef vec_t(MaterialProperty) vec_material_property_t;
-
-typedef struct {
-  vec_material_property_t properties;
-} ModelMaterial;
+typedef map_t(MaterialProperty) ModelMaterial;
 
 typedef struct {
   int material;
@@ -32,7 +24,7 @@ typedef struct {
   int drawCount;
 } ModelPrimitive;
 
-typedef struct ModelNode {
+typedef struct {
   float transform[16];
   int parent;
   vec_uint_t children;

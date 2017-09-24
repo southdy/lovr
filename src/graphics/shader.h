@@ -43,7 +43,6 @@ typedef struct {
   int dirty;
 } Uniform;
 
-typedef map_t(UniformValue) map_uniform_value_t;
 typedef map_t(Uniform) map_uniform_t;
 
 typedef struct {

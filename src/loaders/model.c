@@ -74,6 +74,7 @@ ModelData* lovrModelDataCreate(Blob* blob) {
   for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
     struct aiMesh* assimpMesh = scene->mMeshes[m];
 
+    modelData->primitives[m].material = assimpMesh->mMaterialIndex;
     modelData->primitives[m].drawStart = index;
     modelData->primitives[m].drawCount = 0;
 
@@ -116,6 +117,26 @@ ModelData* lovrModelDataCreate(Blob* blob) {
           modelData->vertices[vertex++] = 0;
         }
       }
+    }
+  }
+
+  // Materials
+  modelData->materialCount = scene->mNumMaterials;
+  modelData->materials = malloc(modelData->materialCount * sizeof(ModelMaterial));
+  for (unsigned int i = 0; i < scene->mNumMaterials; i++) {
+    struct aiMaterial* material = scene->mMaterials[i];
+    struct aiColor4D color;
+
+    map_init(&modelData->materials[i]);
+
+    if (aiGetMaterialColor(material, AI_MATKEY_COLOR_DIFFUSE, &color) == aiReturn_SUCCESS) {
+      MaterialProperty property = { .type = PROPERTY_COLOR, .value = malloc(4 * sizeof(float)) };
+      float* value = property.value;
+      value[0] = color.r;
+      value[1] = color.g;
+      value[2] = color.b;
+      value[3] = color.a;
+      map_set(&modelData->materials[i], "lovrDiffuseColor", property);
     }
   }
 
