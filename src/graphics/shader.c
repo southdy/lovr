@@ -32,6 +32,7 @@ static const char* lovrShaderFragmentPrefix = ""
 "in vec2 texCoord; \n"
 "out vec4 lovrFragColor; \n"
 "uniform vec4 lovrColor; \n"
+"uniform vec4 lovrDiffuseColor; \n"
 "uniform sampler2D lovrTexture; \n";
 
 static const char* lovrShaderVertexSuffix = ""
@@ -52,7 +53,7 @@ static const char* lovrDefaultVertexShader = ""
 
 static const char* lovrDefaultFragmentShader = ""
 "vec4 color(vec4 graphicsColor, sampler2D image, vec2 uv) { \n"
-"  return graphicsColor * texture(image, uv); \n"
+"  return lovrDiffuseColor * graphicsColor * texture(image, uv); \n"
 "}";
 
 static const char* lovrSkyboxVertexShader = ""
