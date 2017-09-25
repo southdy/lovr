@@ -266,10 +266,32 @@ Shader* lovrShaderCreate(const char* vertexSource, const char* fragmentSource) {
 
     memset(uniform.value.data, 0, uniform.size);
 
-    if (uniform.type == UNIFORM_MATRIX) {
-      for (int j = 0; j < uniform.components; j++) {
-        int index = j * uniform.components + j;
-        uniform.value.floats[index] = 1.;
+    size_t offset = 0;
+    for (int j = 0; j < uniform.count; j++) {
+      int location = uniform.location;
+
+      if (uniform.count > 1) {
+        char name[LOVR_MAX_UNIFORM_LENGTH];
+        snprintf(name, LOVR_MAX_UNIFORM_LENGTH, "%s[%d]", uniform.name, j);
+        location = glGetUniformLocation(program, name);
+      }
+
+      switch (uniform.type) {
+        case UNIFORM_FLOAT:
+          glGetUniformfv(program, location, &uniform.value.floats[offset]);
+          offset += uniform.components;
+          break;
+
+        case UNIFORM_SAMPLER:
+        case UNIFORM_INT:
+          glGetUniformiv(program, location, &uniform.value.ints[offset]);
+          offset += uniform.components;
+          break;
+
+        case UNIFORM_MATRIX:
+          glGetUniformfv(program, location, &uniform.value.floats[offset]);
+          offset += uniform.components * uniform.components;
+          break;
       }
     }
 
