@@ -3,7 +3,6 @@
 #include "math/mat4.h"
 #include "math/vec3.h"
 #include <stdlib.h>
-#include <float.h>
 
 static void renderNode(Model* model, int nodeIndex) {
   ModelNode* node = &model->modelData->nodes[nodeIndex];
@@ -29,12 +28,6 @@ Model* lovrModelCreate(ModelData* modelData) {
   if (!model) return NULL;
 
   model->modelData = modelData;
-  model->aabb[0] = FLT_MAX;
-  model->aabb[1] = FLT_MIN;
-  model->aabb[2] = FLT_MAX;
-  model->aabb[3] = FLT_MIN;
-  model->aabb[4] = FLT_MAX;
-  model->aabb[5] = FLT_MIN;
 
   MeshFormat format;
   vec_init(&format);
@@ -103,5 +96,5 @@ void lovrModelSetTexture(Model* model, Texture* texture) {
 }
 
 float* lovrModelGetAABB(Model* model) {
-  return model->aabb;
+  return model->modelData->aabb;
 }

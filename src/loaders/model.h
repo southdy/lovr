@@ -29,6 +29,7 @@ typedef struct {
   int indexCount;
   int hasNormals;
   int hasUVs;
+  float aabb[6];
 } ModelData;
 
 ModelData* lovrModelDataCreate(Blob* blob);

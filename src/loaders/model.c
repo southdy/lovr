@@ -1,6 +1,7 @@
 #include "loaders/model.h"
 #include "math/mat4.h"
 #include <stdlib.h>
+#include <float.h>
 #include <assimp/scene.h>
 #include <assimp/config.h>
 #include <assimp/cimport.h>
@@ -53,6 +54,13 @@ ModelData* lovrModelDataCreate(Blob* blob) {
   modelData->hasNormals = 0;
   modelData->hasUVs = 0;
 
+  modelData->aabb[0] = FLT_MAX;
+  modelData->aabb[1] = FLT_MIN;
+  modelData->aabb[2] = FLT_MAX;
+  modelData->aabb[3] = FLT_MIN;
+  modelData->aabb[4] = FLT_MAX;
+  modelData->aabb[5] = FLT_MIN;
+
   for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
     struct aiMesh* assimpMesh = scene->mMeshes[m];
     modelData->vertexCount += assimpMesh->mNumVertices;
@@ -94,6 +102,13 @@ ModelData* lovrModelDataCreate(Blob* blob) {
       modelData->vertices[vertex++] = assimpMesh->mVertices[v].x;
       modelData->vertices[vertex++] = assimpMesh->mVertices[v].y;
       modelData->vertices[vertex++] = assimpMesh->mVertices[v].z;
+
+      modelData->aabb[0] = MIN(modelData->aabb[0], assimpMesh->mVertices[v].x);
+      modelData->aabb[1] = MAX(modelData->aabb[1], assimpMesh->mVertices[v].x);
+      modelData->aabb[2] = MIN(modelData->aabb[2], assimpMesh->mVertices[v].y);
+      modelData->aabb[3] = MAX(modelData->aabb[3], assimpMesh->mVertices[v].y);
+      modelData->aabb[4] = MIN(modelData->aabb[4], assimpMesh->mVertices[v].z);
+      modelData->aabb[5] = MAX(modelData->aabb[5], assimpMesh->mVertices[v].z);
 
       if (modelData->hasNormals) {
         if (assimpMesh->mNormals) {

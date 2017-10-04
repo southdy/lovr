@@ -12,7 +12,6 @@ typedef struct {
   ModelData* modelData;
   Mesh* mesh;
   Texture* texture;
-  float aabb[6];
 } Model;
 
 Model* lovrModelCreate(ModelData* modelData);
