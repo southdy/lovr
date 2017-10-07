@@ -29,6 +29,7 @@ typedef union {
   void* data;
   float* floats;
   int* ints;
+  Texture** textures;
 } UniformValue;
 
 typedef struct {
@@ -40,6 +41,8 @@ typedef struct {
   int count;
   size_t size;
   UniformValue value;
+  Texture** textures;
+  int textureUnitOffset;
   int dirty;
 } Uniform;
 

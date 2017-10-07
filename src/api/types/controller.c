@@ -74,7 +74,7 @@ int l_lovrControllerNewModel(lua_State* L) {
   if (modelData) {
     Model* model = lovrModelCreate(modelData);
     if (textureData) {
-      Texture* texture = lovrTextureCreate(textureData);
+      Texture* texture = lovrTextureCreate(TEXTURE_2D, &textureData, 1);
       lovrModelSetTexture(model, texture);
       lovrRelease(&texture->ref);
     }

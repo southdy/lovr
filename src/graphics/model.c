@@ -12,7 +12,6 @@ static void renderNode(Model* model, int nodeIndex) {
   lovrGraphicsMatrixTransform(MATRIX_MODEL, node->transform);
 
   Shader* shader = lovrGraphicsGetActiveShader();
-
   for (int i = 0; i < node->primitives.length; i++) {
     ModelPrimitive* primitive = &model->modelData->primitives[node->primitives.data[i]];
     ModelMaterial* material = &model->modelData->materials[primitive->material];

@@ -162,14 +162,12 @@ static UniformType getUniformType(GLenum type, const char* debug) {
     case GL_FLOAT_MAT4:
       return UNIFORM_MATRIX;
 
-    case GL_SAMPLER_1D:
     case GL_SAMPLER_2D:
-    case GL_SAMPLER_3D:
     case GL_SAMPLER_CUBE:
       return UNIFORM_SAMPLER;
 
     default:
-      lovrThrow("Unknown uniform type for uniform '%s'", debug);
+      lovrThrow("Unknown type for uniform '%s'", debug);
       return UNIFORM_FLOAT;
   }
 }
@@ -178,9 +176,7 @@ static int getUniformComponents(GLenum type) {
   switch (type) {
     case GL_FLOAT:
     case GL_INT:
-    case GL_SAMPLER_1D:
     case GL_SAMPLER_2D:
-    case GL_SAMPLER_3D:
     case GL_SAMPLER_CUBE:
       return 1;
 
@@ -227,6 +223,7 @@ Shader* lovrShaderCreate(const char* vertexSource, const char* fragmentSource) {
 
   // Store uniform info
   GLint uniformCount;
+  int textureUnitOffset = 0;
   GLsizei bufferSize = LOVR_MAX_UNIFORM_LENGTH / sizeof(GLchar);
   map_init(&shader->uniforms);
   glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &uniformCount);
@@ -244,6 +241,7 @@ Shader* lovrShaderCreate(const char* vertexSource, const char* fragmentSource) {
     uniform.location = glGetUniformLocation(program, uniform.name);
     uniform.type = getUniformType(type, uniform.name);
     uniform.components = getUniformComponents(type);
+    uniform.textureUnitOffset = textureUnitOffset;
     uniform.dirty = 1;
 
     switch (uniform.type) {
@@ -252,15 +250,25 @@ Shader* lovrShaderCreate(const char* vertexSource, const char* fragmentSource) {
         uniform.value.data = malloc(uniform.size);
         break;
 
+      case UNIFORM_MATRIX:
+        uniform.size = uniform.components * uniform.components * uniform.count * sizeof(int);
+        uniform.value.data = malloc(uniform.size);
+        break;
+
       case UNIFORM_INT:
-      case UNIFORM_SAMPLER:
         uniform.size = uniform.components * uniform.count * sizeof(int);
         uniform.value.data = malloc(uniform.size);
         break;
 
-      case UNIFORM_MATRIX:
-        uniform.size = uniform.components * uniform.components * uniform.count * sizeof(int);
+      case UNIFORM_SAMPLER:
+        uniform.size = uniform.components * uniform.count * MAX(sizeof(Texture*), sizeof(int));
         uniform.value.data = malloc(uniform.size);
+
+        // Use the value for ints to bind texture slots, but use the value for textures afterwards.
+        for (int i = 0; i < uniform.count; i++) {
+          uniform.value.ints[i] = uniform.textureUnitOffset + i;
+        }
+        glUniform1iv(uniform.location, uniform.count, uniform.value.ints);
         break;
     }
 
@@ -282,20 +290,23 @@ Shader* lovrShaderCreate(const char* vertexSource, const char* fragmentSource) {
           offset += uniform.components;
           break;
 
-        case UNIFORM_SAMPLER:
+        case UNIFORM_MATRIX:
+          glGetUniformfv(program, location, &uniform.value.floats[offset]);
+          offset += uniform.components * uniform.components;
+          break;
+
         case UNIFORM_INT:
           glGetUniformiv(program, location, &uniform.value.ints[offset]);
           offset += uniform.components;
           break;
 
-        case UNIFORM_MATRIX:
-          glGetUniformfv(program, location, &uniform.value.floats[offset]);
-          offset += uniform.components * uniform.components;
+        default:
           break;
       }
     }
 
     map_set(&shader->uniforms, uniform.name, uniform);
+    textureUnitOffset += (uniform.type == UNIFORM_SAMPLER) ? uniform.count : 0;
   }
 
   lovrShaderBind(shader, 1);
@@ -324,6 +335,19 @@ Shader* lovrShaderCreateDefault(DefaultShader type) {
 void lovrShaderDestroy(const Ref* ref) {
   Shader* shader = containerof(ref, Shader);
   glDeleteProgram(shader->program);
+  const char* key;
+  map_iter_t iter = map_iter(&shader->uniforms);
+  while ((key = map_next(&shader->uniforms, &iter))) {
+    Uniform* uniform = map_get(&shader->uniforms, key);
+    if (uniform->type == UNIFORM_SAMPLER) {
+      for (int i = 0; i < uniform->count; i++) {
+        if (uniform->value.textures[i]) {
+          lovrRelease(&uniform->value.textures[i]->ref);
+        }
+      }
+    }
+    free(uniform->value.data);
+  }
   map_deinit(&shader->uniforms);
   free(shader);
 }
@@ -349,8 +373,15 @@ void lovrShaderBind(Shader* shader, int force) {
           }
           break;
 
+        case UNIFORM_MATRIX:
+          switch (uniform->components) {
+            case 2: glUniformMatrix2fv(uniform->location, uniform->count, GL_FALSE, uniform->value.floats); break;
+            case 3: glUniformMatrix3fv(uniform->location, uniform->count, GL_FALSE, uniform->value.floats); break;
+            case 4: glUniformMatrix4fv(uniform->location, uniform->count, GL_FALSE, uniform->value.floats); break;
+          }
+          break;
+
         case UNIFORM_INT:
-        case UNIFORM_SAMPLER:
           switch (uniform->components) {
             case 1: glUniform1iv(uniform->location, uniform->count, uniform->value.ints); break;
             case 2: glUniform2iv(uniform->location, uniform->count, uniform->value.ints); break;
@@ -359,13 +390,15 @@ void lovrShaderBind(Shader* shader, int force) {
           }
           break;
 
-        case UNIFORM_MATRIX:
-          switch (uniform->components) {
-            case 2: glUniformMatrix2fv(uniform->location, uniform->count, GL_FALSE, uniform->value.floats); break;
-            case 3: glUniformMatrix3fv(uniform->location, uniform->count, GL_FALSE, uniform->value.floats); break;
-            case 4: glUniformMatrix4fv(uniform->location, uniform->count, GL_FALSE, uniform->value.floats); break;
+        case UNIFORM_SAMPLER:
+          for (int i = 0; i < uniform->count; i++) {
+            glActiveTexture(GL_TEXTURE0 + uniform->textureUnitOffset + i);
+            lovrGraphicsBindTexture(uniform->value.textures[i]);
           }
+          glActiveTexture(GL_TEXTURE0);
           break;
+
+        default: break;
       }
     }
   }
@@ -386,7 +419,23 @@ Uniform* lovrShaderGetUniform(Shader* shader, const char* name) {
 void lovrShaderUpdateUniform(Shader* shader, const char* name, UniformValue value) {
   Uniform* uniform = map_get(&shader->uniforms, name);
   if (uniform && memcmp(uniform->value.data, value.data, uniform->size)) {
+    if (uniform->type == UNIFORM_SAMPLER) {
+      for (int i = 0; i < uniform->count; i++) {
+        if (uniform->value.textures[i]) {
+          lovrRelease(&uniform->value.textures[i]->ref);
+        }
+      }
+    }
+
     memcpy(uniform->value.data, value.data, uniform->size);
     uniform->dirty = 1;
+
+    if (uniform->type == UNIFORM_SAMPLER) {
+      for (int i = 0; i < uniform->count; i++) {
+        if (value.textures[i]) {
+          lovrRetain(&value.textures[i]->ref);
+        }
+      }
+    }
   }
 }

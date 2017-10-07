@@ -50,7 +50,7 @@ void lovrGraphicsReset() {
   float projection[16];
   state.transform = 0;
   state.canvas = 0;
-  state.defaultShader = -1;
+  state.defaultShader = SHADER_DEFAULT;
   lovrGraphicsSetBackgroundColor((Color) { 0, 0, 0, 255 });
   lovrGraphicsSetBlendMode(BLEND_ALPHA, BLEND_ALPHA_MULTIPLY);
   lovrGraphicsSetColor((Color) { 255, 255, 255, 255 });
@@ -777,7 +777,7 @@ void lovrGraphicsCylinder(float x1, float y1, float z1, float x2, float y2, floa
 #undef PUSH_CYLINDER_TRIANGLE
 }
 
-void lovrGraphicsSphere(Texture* texture, mat4 transform, int segments, Skybox* skybox) {
+void lovrGraphicsSphere(Texture* texture, mat4 transform, int segments) {
   vec_clear(&state.streamData);
   vec_clear(&state.streamIndices);
 
@@ -794,11 +794,9 @@ void lovrGraphicsSphere(Texture* texture, mat4 transform, int segments, Skybox* 
       vec_push(&state.streamData, y);
       vec_push(&state.streamData, z);
 
-      if (!skybox) {
-        vec_push(&state.streamData, x);
-        vec_push(&state.streamData, y);
-        vec_push(&state.streamData, z);
-      }
+      vec_push(&state.streamData, x);
+      vec_push(&state.streamData, y);
+      vec_push(&state.streamData, z);
 
       vec_push(&state.streamData, u);
       vec_push(&state.streamData, v);
@@ -821,22 +819,29 @@ void lovrGraphicsSphere(Texture* texture, mat4 transform, int segments, Skybox* 
   }
 
   lovrGraphicsSetDefaultShader(SHADER_DEFAULT);
+  lovrGraphicsBindTexture(texture);
 
-  if (skybox) {
-    Texture* oldTexture = lovrGraphicsGetTexture();
-    glBindTexture(GL_TEXTURE_2D, skybox->texture);
-    lovrGraphicsDrawPrimitive(GL_TRIANGLES, 0, 1, 1);
-    glBindTexture(GL_TEXTURE_2D, oldTexture->id);
-  } else {
-    lovrGraphicsBindTexture(texture);
+  if (transform) {
     lovrGraphicsPush();
     lovrGraphicsMatrixTransform(MATRIX_MODEL, transform);
-    lovrGraphicsDrawPrimitive(GL_TRIANGLES, 1, 1, 1);
+  }
+
+  Shader* shader = lovrGraphicsGetActiveShader();
+  if (shader) {
+    float color[4] = { 1., 1., 1., 1. };
+    UniformValue value;
+    value.floats = color;
+    lovrShaderUpdateUniform(lovrGraphicsGetActiveShader(), "lovrDiffuseColor", value);
+  }
+
+  lovrGraphicsDrawPrimitive(GL_TRIANGLES, 1, 1, 1);
+
+  if (transform) {
     lovrGraphicsPop();
   }
 }
 
-void lovrGraphicsSkybox(Skybox* skybox, float angle, float ax, float ay, float az) {
+void lovrGraphicsSkybox(Texture* texture, float angle, float ax, float ay, float az) {
   lovrGraphicsPush();
   lovrGraphicsOrigin();
   lovrGraphicsRotate(MATRIX_MODEL, angle, ax, ay, az);
@@ -844,7 +849,7 @@ void lovrGraphicsSkybox(Skybox* skybox, float angle, float ax, float ay, float a
   int wasCulling = lovrGraphicsIsCullingEnabled();
   lovrGraphicsSetCullingEnabled(0);
 
-  if (skybox->type == SKYBOX_CUBE) {
+  if (texture->type == TEXTURE_CUBE) {
     float cube[] = {
       // Front
       1.f, -1.f, -1.f,
@@ -887,15 +892,14 @@ void lovrGraphicsSkybox(Skybox* skybox, float angle, float ax, float ay, float a
       1.f, 1.f, 1.f
     };
 
-    lovrGraphicsSetShapeData(cube, 78);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, skybox->texture);
+    lovrGraphicsSetShapeData(cube, 78);
+    lovrGraphicsBindTexture(texture);
     lovrGraphicsSetDefaultShader(SHADER_SKYBOX);
     lovrGraphicsDrawPrimitive(GL_TRIANGLE_STRIP, 0, 0, 0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
     glActiveTexture(GL_TEXTURE0);
-  } else if (skybox->type == SKYBOX_PANORAMA) {
-    lovrGraphicsSphere(NULL, NULL, 30, skybox);
+  } else if (texture->type == TEXTURE_2D) {
+    lovrGraphicsSphere(texture, NULL, 30);
   }
 
   lovrGraphicsSetCullingEnabled(wasCulling);
@@ -966,7 +970,8 @@ Texture* lovrGraphicsGetTexture() {
 void lovrGraphicsBindTexture(Texture* texture) {
   if (!texture) {
     if (!state.defaultTexture) {
-      state.defaultTexture = lovrTextureCreate(lovrTextureDataGetBlank(1, 1, 0xff, FORMAT_RGBA));
+      TextureData* textureData = lovrTextureDataGetBlank(1, 1, 0xff, FORMAT_RGBA);
+      state.defaultTexture = lovrTextureCreate(TEXTURE_2D, &textureData, 1);
     }
 
     texture = state.defaultTexture;
@@ -974,7 +979,7 @@ void lovrGraphicsBindTexture(Texture* texture) {
 
   if (texture != state.texture) {
     state.texture = texture;
-    glBindTexture(GL_TEXTURE_2D, texture->id);
+    glBindTexture(texture->type, texture->id);
   }
 }
 
