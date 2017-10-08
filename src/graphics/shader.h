@@ -41,7 +41,6 @@ typedef struct {
   int count;
   size_t size;
   UniformValue value;
-  Texture** textures;
   int textureUnitOffset;
   int dirty;
 } Uniform;
