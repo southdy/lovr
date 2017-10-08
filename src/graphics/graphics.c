@@ -84,16 +84,18 @@ void lovrGraphicsPrepare() {
     shader = state.defaultShaders[state.defaultShader] = lovrShaderCreateDefault(state.defaultShader);
   }
 
+  lovrGraphicsBindProgram(shader->program);
+
   UniformValue value;
   mat4 model = state.transforms[state.transform][MATRIX_MODEL];
   mat4 view = state.transforms[state.transform][MATRIX_VIEW];
   mat4 projection = state.canvases[state.canvas].projection;
 
   value.floats = model;
-  lovrShaderUpdateUniform(shader, "lovrModel", value);
+  lovrShaderSetUniformValue(shader, "lovrModel", value);
 
   value.floats = view;
-  lovrShaderUpdateUniform(shader, "lovrView", value);
+  lovrShaderSetUniformValue(shader, "lovrView", value);
 
   int hasTransform = lovrShaderGetUniform(shader, "lovrTransform") != NULL;
   int hasNormalMatrix = lovrShaderGetUniform(shader, "lovrNormalMatrix") != NULL;
@@ -103,7 +105,7 @@ void lovrGraphicsPrepare() {
 
     if (hasTransform) {
       value.floats = transform;
-      lovrShaderUpdateUniform(shader, "lovrTransform", value);
+      lovrShaderSetUniformValue(shader, "lovrTransform", value);
     }
 
     if (hasNormalMatrix) {
@@ -120,18 +122,16 @@ void lovrGraphicsPrepare() {
       };
 
       value.floats = normalMatrix;
-      lovrShaderUpdateUniform(shader, "lovrNormalMatrix", value);
+      lovrShaderSetUniformValue(shader, "lovrNormalMatrix", value);
     }
   }
 
   value.floats = projection;
-  lovrShaderUpdateUniform(shader, "lovrProjection", value);
+  lovrShaderSetUniformValue(shader, "lovrProjection", value);
 
   float color[4] = { state.color.r / 255., state.color.g / 255., state.color.b / 255., state.color.a / 255. };
   value.floats = color;
-  lovrShaderUpdateUniform(shader, "lovrColor", value);
-
-  lovrShaderBind(shader, 0);
+  lovrShaderSetUniformValue(shader, "lovrColor", value);
 }
 
 void lovrGraphicsCreateWindow(int w, int h, int fullscreen, int msaa, const char* title, const char* icon) {
@@ -831,7 +831,7 @@ void lovrGraphicsSphere(Texture* texture, mat4 transform, int segments) {
     float color[4] = { 1., 1., 1., 1. };
     UniformValue value;
     value.floats = color;
-    lovrShaderUpdateUniform(lovrGraphicsGetActiveShader(), "lovrDiffuseColor", value);
+    lovrShaderSetUniformValue(lovrGraphicsGetActiveShader(), "lovrDiffuseColor", value);
   }
 
   lovrGraphicsDrawPrimitive(GL_TRIANGLES, 1, 1, 1);
@@ -892,10 +892,12 @@ void lovrGraphicsSkybox(Texture* texture, float angle, float ax, float ay, float
       1.f, 1.f, 1.f
     };
 
-    glActiveTexture(GL_TEXTURE1);
     lovrGraphicsSetShapeData(cube, 78);
     lovrGraphicsBindTexture(texture);
     lovrGraphicsSetDefaultShader(SHADER_SKYBOX);
+    UniformValue value;
+    value.textures = &texture;
+    lovrShaderSetUniformValue(state.defaultShaders[SHADER_SKYBOX], "cube", value);
     lovrGraphicsDrawPrimitive(GL_TRIANGLE_STRIP, 0, 0, 0);
     glActiveTexture(GL_TEXTURE0);
   } else if (texture->type == TEXTURE_2D) {

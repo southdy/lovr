@@ -59,4 +59,4 @@ void lovrShaderDestroy(const Ref* ref);
 void lovrShaderBind(Shader* shader, int force);
 int lovrShaderGetAttributeId(Shader* shader, const char* name);
 Uniform* lovrShaderGetUniform(Shader* shader, const char* name);
-void lovrShaderUpdateUniform(Shader* shader, const char* name, UniformValue value);
+void lovrShaderSetUniformValue(Shader* shader, const char* name, UniformValue value);

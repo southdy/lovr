@@ -24,7 +24,7 @@ static void renderNode(Model* model, int nodeIndex) {
         if (lovrShaderGetUniform(shader, key)) {
           MaterialProperty* property = map_get(material, key);
           value.data = property->value;
-          lovrShaderUpdateUniform(shader, key, value);
+          lovrShaderSetUniformValue(shader, key, value);
         }
       }
     }

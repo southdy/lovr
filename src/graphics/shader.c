@@ -309,23 +309,13 @@ Shader* lovrShaderCreate(const char* vertexSource, const char* fragmentSource) {
     textureUnitOffset += (uniform.type == UNIFORM_SAMPLER) ? uniform.count : 0;
   }
 
-  lovrShaderBind(shader, 1);
-
   return shader;
 }
 
 Shader* lovrShaderCreateDefault(DefaultShader type) {
   switch (type) {
     case SHADER_DEFAULT: return lovrShaderCreate(NULL, NULL);
-    case SHADER_SKYBOX: {
-      Shader* shader = lovrShaderCreate(lovrSkyboxVertexShader, lovrSkyboxFragmentShader);
-      Uniform* uniform = map_get(&shader->uniforms, "cube");
-      if (uniform) {
-        uniform->value.ints[0] = 1;
-        lovrShaderUpdateUniform(shader, "cube", uniform->value);
-      }
-      return shader;
-    }
+    case SHADER_SKYBOX: return lovrShaderCreate(lovrSkyboxVertexShader, lovrSkyboxFragmentShader);
     case SHADER_FONT: return lovrShaderCreate(NULL, lovrFontFragmentShader);
     case SHADER_FULLSCREEN: return lovrShaderCreate(lovrNoopVertexShader, NULL);
     default: lovrThrow("Unknown default shader type");
@@ -352,58 +342,6 @@ void lovrShaderDestroy(const Ref* ref) {
   free(shader);
 }
 
-void lovrShaderBind(Shader* shader, int force) {
-  lovrGraphicsBindProgram(shader->program);
-
-  const char* key;
-  map_iter_t iter = map_iter(&shader->uniforms);
-  while ((key = map_next(&shader->uniforms, &iter))) {
-    Uniform* uniform = map_get(&shader->uniforms, key);
-
-    if (force || uniform->dirty) {
-      uniform->dirty = 0;
-
-      switch (uniform->type) {
-        case UNIFORM_FLOAT:
-          switch (uniform->components) {
-            case 1: glUniform1fv(uniform->location, uniform->count, uniform->value.floats); break;
-            case 2: glUniform2fv(uniform->location, uniform->count, uniform->value.floats); break;
-            case 3: glUniform3fv(uniform->location, uniform->count, uniform->value.floats); break;
-            case 4: glUniform4fv(uniform->location, uniform->count, uniform->value.floats); break;
-          }
-          break;
-
-        case UNIFORM_MATRIX:
-          switch (uniform->components) {
-            case 2: glUniformMatrix2fv(uniform->location, uniform->count, GL_FALSE, uniform->value.floats); break;
-            case 3: glUniformMatrix3fv(uniform->location, uniform->count, GL_FALSE, uniform->value.floats); break;
-            case 4: glUniformMatrix4fv(uniform->location, uniform->count, GL_FALSE, uniform->value.floats); break;
-          }
-          break;
-
-        case UNIFORM_INT:
-          switch (uniform->components) {
-            case 1: glUniform1iv(uniform->location, uniform->count, uniform->value.ints); break;
-            case 2: glUniform2iv(uniform->location, uniform->count, uniform->value.ints); break;
-            case 3: glUniform3iv(uniform->location, uniform->count, uniform->value.ints); break;
-            case 4: glUniform4iv(uniform->location, uniform->count, uniform->value.ints); break;
-          }
-          break;
-
-        case UNIFORM_SAMPLER:
-          for (int i = 0; i < uniform->count; i++) {
-            glActiveTexture(GL_TEXTURE0 + uniform->textureUnitOffset + i);
-            lovrGraphicsBindTexture(uniform->value.textures[i]);
-          }
-          glActiveTexture(GL_TEXTURE0);
-          break;
-
-        default: break;
-      }
-    }
-  }
-}
-
 int lovrShaderGetAttributeId(Shader* shader, const char* name) {
   if (!shader) {
     return -1;
@@ -416,26 +354,60 @@ Uniform* lovrShaderGetUniform(Shader* shader, const char* name) {
   return map_get(&shader->uniforms, name);
 }
 
-void lovrShaderUpdateUniform(Shader* shader, const char* name, UniformValue value) {
-  Uniform* uniform = map_get(&shader->uniforms, name);
-  if (uniform && memcmp(uniform->value.data, value.data, uniform->size)) {
-    if (uniform->type == UNIFORM_SAMPLER) {
-      for (int i = 0; i < uniform->count; i++) {
-        if (uniform->value.textures[i]) {
-          lovrRelease(&uniform->value.textures[i]->ref);
-        }
+void lovrShaderSetUniformValue(Shader* shader, const char* name, UniformValue value) {
+  Uniform* uniform = lovrShaderGetUniform(shader, name);
+
+  if (!uniform || !memcmp(uniform->value.data, value.data, uniform->size)) {
+    return;
+  }
+
+  lovrGraphicsBindProgram(shader->program);
+
+  switch (uniform->type) {
+    case UNIFORM_FLOAT:
+      switch (uniform->components) {
+        case 1: glUniform1fv(uniform->location, uniform->count, value.floats); break;
+        case 2: glUniform2fv(uniform->location, uniform->count, value.floats); break;
+        case 3: glUniform3fv(uniform->location, uniform->count, value.floats); break;
+        case 4: glUniform4fv(uniform->location, uniform->count, value.floats); break;
       }
-    }
+      break;
 
-    memcpy(uniform->value.data, value.data, uniform->size);
-    uniform->dirty = 1;
+    case UNIFORM_MATRIX:
+      switch (uniform->components) {
+        case 2: glUniformMatrix2fv(uniform->location, uniform->count, GL_FALSE, value.floats); break;
+        case 3: glUniformMatrix3fv(uniform->location, uniform->count, GL_FALSE, value.floats); break;
+        case 4: glUniformMatrix4fv(uniform->location, uniform->count, GL_FALSE, value.floats); break;
+      }
+      break;
 
-    if (uniform->type == UNIFORM_SAMPLER) {
+    case UNIFORM_INT:
+      switch (uniform->components) {
+        case 1: glUniform1iv(uniform->location, uniform->count, value.ints); break;
+        case 2: glUniform2iv(uniform->location, uniform->count, value.ints); break;
+        case 3: glUniform3iv(uniform->location, uniform->count, value.ints); break;
+        case 4: glUniform4iv(uniform->location, uniform->count, value.ints); break;
+      }
+      break;
+
+    case UNIFORM_SAMPLER:
       for (int i = 0; i < uniform->count; i++) {
         if (value.textures[i]) {
           lovrRetain(&value.textures[i]->ref);
         }
+
+        if (uniform->value.textures[i]) {
+          lovrRelease(&uniform->value.textures[i]->ref);
+        }
+
+        glActiveTexture(GL_TEXTURE0 + uniform->textureUnitOffset + i);
+        lovrGraphicsBindTexture(value.textures[i]);
       }
-    }
+      glActiveTexture(GL_TEXTURE0);
+      break;
+
+    default: break;
   }
+
+  memcpy(uniform->value.data, value.data, uniform->size);
 }

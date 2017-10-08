@@ -95,7 +95,7 @@ int l_lovrShaderSend(lua_State* L) {
       break;
   }
 
-  lovrShaderUpdateUniform(shader, name, value);
+  lovrShaderSetUniformValue(shader, name, value);
   return 0;
 }
 
