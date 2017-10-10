@@ -4,8 +4,8 @@
 #include <stdio.h>
 
 static void lovrMeshBindAttributes(Mesh* mesh) {
-  Shader* shader = lovrGraphicsGetActiveShader();
-  if (shader == mesh->lastShader && !mesh->attributesDirty) {
+  //Shader* shader = lovrGraphicsGetActiveShader();
+  /*if (shader == mesh->lastShader && !mesh->attributesDirty) {
     return;
   }
 
@@ -36,7 +36,7 @@ static void lovrMeshBindAttributes(Mesh* mesh) {
   }
 
   mesh->lastShader = shader;
-  mesh->attributesDirty = 0;
+  mesh->attributesDirty = 0;*/
 }
 
 Mesh* lovrMeshCreate(size_t count, MeshFormat* format, MeshDrawMode drawMode, MeshUsage usage) {
@@ -82,8 +82,7 @@ Mesh* lovrMeshCreate(size_t count, MeshFormat* format, MeshDrawMode drawMode, Me
   mesh->isRangeEnabled = 0;
   mesh->rangeStart = 0;
   mesh->rangeCount = mesh->count;
-  mesh->texture = NULL;
-  mesh->lastShader = NULL;
+  mesh->material = NULL;
 
   glGenBuffers(1, &mesh->vbo);
   glGenBuffers(1, &mesh->ibo);
@@ -100,8 +99,8 @@ Mesh* lovrMeshCreate(size_t count, MeshFormat* format, MeshDrawMode drawMode, Me
 
 void lovrMeshDestroy(const Ref* ref) {
   Mesh* mesh = containerof(ref, Mesh);
-  if (mesh->texture) {
-    lovrRelease(&mesh->texture->ref);
+  if (mesh->material) {
+    lovrRelease(&mesh->material->ref);
   }
   glDeleteBuffers(1, &mesh->vbo);
   glDeleteBuffers(1, &mesh->ibo);
@@ -124,9 +123,7 @@ void lovrMeshDraw(Mesh* mesh, mat4 transform) {
     lovrGraphicsMatrixTransform(MATRIX_MODEL, transform);
   }
 
-  lovrGraphicsBindTexture(mesh->texture);
-  lovrGraphicsSetDefaultShader(SHADER_DEFAULT);
-  lovrGraphicsPrepare();
+  lovrGraphicsBindMaterial(mesh->material);
   lovrGraphicsBindVertexArray(mesh->vao);
   lovrMeshBindAttributes(mesh);
   size_t start = mesh->rangeStart;
@@ -242,20 +239,20 @@ int lovrMeshSetDrawRange(Mesh* mesh, int start, int count) {
   return 0;
 }
 
-Texture* lovrMeshGetTexture(Mesh* mesh) {
-  return mesh->texture;
+Material* lovrMeshGetMaterial(Mesh* mesh) {
+  return mesh->material;
 }
 
-void lovrMeshSetTexture(Mesh* mesh, Texture* texture) {
-  if (mesh->texture != texture) {
-    if (mesh->texture) {
-      lovrRelease(&mesh->texture->ref);
+void lovrMeshSetMaterial(Mesh* mesh, Material* material) {
+  if (mesh->material != material) {
+    if (mesh->material) {
+      lovrRelease(&mesh->material->ref);
     }
 
-    mesh->texture = texture;
+    mesh->material = material;
 
-    if (mesh->texture) {
-      lovrRetain(&mesh->texture->ref);
+    if (mesh->material) {
+      lovrRetain(&mesh->material->ref);
     }
   }
 }

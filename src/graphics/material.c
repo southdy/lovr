@@ -23,14 +23,36 @@ Shader* lovrMaterialGetShader(Material* material) {
 }
 
 void lovrMaterialBind(Material* material) {
+  /*
   const char* key;
   map_iter_t iter = map_iter(&material->values);
   while ((key = map_next(&material->values, &iter))) {
     UniformValue* value = map_get(&material->values, key);
     lovrShaderSetUniformValue(material->shader, key, *value);
   }
+  */
 }
 
-UniformValue* lovrMaterialGetValue(Material* material, const char* uniform) {
-  return map_get(&material->values, uniform);
+void lovrMaterialSetFloats(Material* material, const char* name, float* data, int count) {
+  UniformValue* value = map_get(&material->values, name);
+
+  if (value) {
+    memcpy(value->floats, data, count * sizeof(float));
+  }
+}
+
+void lovrMaterialSetInts(Material* material, const char* name, int* data, int count) {
+  UniformValue* value = map_get(&material->values, name);
+
+  if (value) {
+    memcpy(value->ints, data, count * sizeof(int));
+  }
+}
+
+void lovrMaterialSetTextures(Material* material, const char* name, Texture** data, int count) {
+  UniformValue* value = map_get(&material->values, name);
+
+  if (value) {
+    memcpy(value->textures, data, count * sizeof(Texture*));
+  }
 }

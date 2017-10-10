@@ -63,14 +63,6 @@ static void luax_readvertices(lua_State* L, int index, vec_float_t* points) {
   }
 }
 
-static Texture* luax_readtexture(lua_State* L, int index) {
-  Blob* blob = luax_readblob(L, index, "Texture");
-  TextureData* textureData = lovrTextureDataFromBlob(blob);
-  Texture* texture = lovrTextureCreate(TEXTURE_2D, &textureData, 1);
-  lovrRelease(&blob->ref);
-  return texture;
-}
-
 // Base
 
 int l_lovrGraphicsInit(lua_State* L) {
@@ -367,18 +359,6 @@ int l_lovrGraphicsSetPointSize(lua_State* L) {
   return 0;
 }
 
-int l_lovrGraphicsGetShader(lua_State* L) {
-  Shader* shader = lovrGraphicsGetShader();
-  luax_pushtype(L, Shader, shader);
-  return 1;
-}
-
-int l_lovrGraphicsSetShader(lua_State* L) {
-  Shader* shader = lua_isnoneornil(L, 1) ? NULL : luax_checktype(L, 1, Shader);
-  lovrGraphicsSetShader(shader);
-  return 0;
-}
-
 int l_lovrGraphicsGetWinding(lua_State* L) {
   luax_pushenum(L, &Windings, lovrGraphicsGetWinding());
   return 1;
@@ -478,7 +458,14 @@ int l_lovrGraphicsLine(lua_State* L) {
 }
 
 int l_lovrGraphicsTriangle(lua_State* L) {
-  DrawMode* drawMode = (DrawMode*) luax_checkenum(L, 1, &DrawModes, "draw mode");
+  DrawMode drawMode = DRAW_MODE_FILL;
+  Material* material = NULL;
+  if (lua_isstring(L, 1)) {
+    drawMode = *(DrawMode*) luax_checkenum(L, 1, &DrawModes, "draw mode");
+  } else {
+    material = luax_checktype(L, 1, Material);
+  }
+
   int top = lua_gettop(L);
   if (top != 10) {
     return luaL_error(L, "Expected 9 coordinates to make a triangle, got %d values", top - 1);
@@ -486,42 +473,42 @@ int l_lovrGraphicsTriangle(lua_State* L) {
   vec_float_t points;
   vec_init(&points);
   luax_readvertices(L, 2, &points);
-  lovrGraphicsTriangle(*drawMode, points.data);
+  lovrGraphicsTriangle(drawMode, material, points.data);
   vec_deinit(&points);
   return 0;
 }
 
 int l_lovrGraphicsPlane(lua_State* L) {
-  Texture* texture = NULL;
-  DrawMode drawMode;
+  DrawMode drawMode = DRAW_MODE_FILL;
+  Material* material = NULL;
   if (lua_isstring(L, 1)) {
     drawMode = *(DrawMode*) luax_checkenum(L, 1, &DrawModes, "draw mode");
   } else {
-    drawMode = DRAW_MODE_FILL;
-    texture = luax_checktype(L, 1, Texture);
     if (lua_gettop(L) == 1) {
+      Texture* texture = luax_checktype(L, 1, Texture);
       lovrGraphicsPlaneFullscreen(texture);
       return 0;
     }
+
+    material = luax_checktype(L, 1, Material);
   }
   float transform[16];
   luax_readtransform(L, 2, transform, 1);
-  lovrGraphicsPlane(drawMode, texture, transform);
+  lovrGraphicsPlane(drawMode, material, transform);
   return 0;
 }
 
 static int luax_rectangularprism(lua_State* L, int uniformScale) {
-  Texture* texture = NULL;
-  DrawMode drawMode;
+  DrawMode drawMode = DRAW_MODE_FILL;
+  Material* material = NULL;
   if (lua_isstring(L, 1)) {
     drawMode = *(DrawMode*) luax_checkenum(L, 1, &DrawModes, "draw mode");
   } else {
-    drawMode = DRAW_MODE_FILL;
-    texture = luax_checktype(L, 1, Texture);
+    material = luax_checktype(L, 1, Material);
   }
   float transform[16];
   luax_readtransform(L, 2, transform, uniformScale);
-  lovrGraphicsBox(drawMode, texture, transform);
+  lovrGraphicsBox(drawMode, material, transform);
   return 0;
 }
 
@@ -534,30 +521,36 @@ int l_lovrGraphicsBox(lua_State* L) {
 }
 
 int l_lovrGraphicsCylinder(lua_State* L) {
-  float x1 = luaL_checknumber(L, 1);
-  float y1 = luaL_checknumber(L, 2);
-  float z1 = luaL_checknumber(L, 3);
-  float x2 = luaL_checknumber(L, 4);
-  float y2 = luaL_checknumber(L, 5);
-  float z2 = luaL_checknumber(L, 6);
-  float r1 = luaL_optnumber(L, 7, 1);
-  float r2 = luaL_optnumber(L, 8, 1);
-  int capped = lua_isnoneornil(L, 9) ? 1 : lua_toboolean(L, 9);
-  int segments = luaL_optnumber(L, 10, floorf(16 + 16 * MAX(r1, r2)));
-  lovrGraphicsCylinder(x1, y1, z1, x2, y2, z2, r1, r2, capped, segments);
+  Material* material = NULL;
+  int index = 1;
+  if (lua_isuserdata(L, 1) && (lua_isnoneornil(L, 2) || lua_isnumber(L, 2))) {
+    material = luax_checktype(L, index++, Material);
+  }
+  float x1 = luaL_checknumber(L, index++);
+  float y1 = luaL_checknumber(L, index++);
+  float z1 = luaL_checknumber(L, index++);
+  float x2 = luaL_checknumber(L, index++);
+  float y2 = luaL_checknumber(L, index++);
+  float z2 = luaL_checknumber(L, index++);
+  float r1 = luaL_optnumber(L, index++, 1);
+  float r2 = luaL_optnumber(L, index++, 1);
+  int capped = lua_isnoneornil(L, index) ? 1 : lua_toboolean(L, index);
+  index++;
+  int segments = luaL_optnumber(L, index, floorf(16 + 16 * MAX(r1, r2)));
+  lovrGraphicsCylinder(material, x1, y1, z1, x2, y2, z2, r1, r2, capped, segments);
   return 0;
 }
 
 int l_lovrGraphicsSphere(lua_State* L) {
-  Texture* texture = NULL;
+  Material* material = NULL;
   float transform[16];
   int index = 1;
-  if (lua_isuserdata(L, 1) && (lua_isuserdata(L, 2) || lua_isnumber(L, 2))) {
-    texture = luax_checktype(L, index++, Texture);
+  if (lua_isuserdata(L, 1) && (lua_isnoneornil(L, 2) || lua_isnumber(L, 2))) {
+    material = luax_checktype(L, index++, Material);
   }
   index = luax_readtransform(L, index, transform, 1);
   int segments = luaL_optnumber(L, index, 30);
-  lovrGraphicsSphere(texture, transform, segments);
+  lovrGraphicsSphere(material, transform, segments);
   return 0;
 }
 
@@ -681,11 +674,13 @@ int l_lovrGraphicsNewModel(lua_State* L) {
   ModelData* modelData = lovrModelDataCreate(blob);
   Model* model = lovrModelCreate(modelData);
 
+  /*
   if (lua_gettop(L) >= 2) {
     Texture* texture = luax_readtexture(L, 2);
     lovrModelSetTexture(model, texture);
     lovrRelease(&texture->ref);
   }
+  */
 
   luax_pushtype(L, Model, model);
   lovrRelease(&model->ref);
@@ -790,8 +785,6 @@ const luaL_Reg lovrGraphics[] = {
   { "setLineWidth", l_lovrGraphicsSetLineWidth },
   { "getPointSize", l_lovrGraphicsGetPointSize },
   { "setPointSize", l_lovrGraphicsSetPointSize },
-  { "getShader", l_lovrGraphicsGetShader },
-  { "setShader", l_lovrGraphicsSetShader },
   { "getWinding", l_lovrGraphicsGetWinding },
   { "setWinding", l_lovrGraphicsSetWinding },
   { "isWireframe", l_lovrGraphicsIsWireframe },

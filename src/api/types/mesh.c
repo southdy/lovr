@@ -343,12 +343,12 @@ int l_lovrMeshSetDrawRange(lua_State* L) {
   return 0;
 }
 
-int l_lovrMeshGetTexture(lua_State* L) {
+int l_lovrMeshGetMaterial(lua_State* L) {
   Mesh* mesh = luax_checktype(L, 1, Mesh);
-  Texture* texture = lovrMeshGetTexture(mesh);
+  Material* material = lovrMeshGetMaterial(mesh);
 
-  if (texture) {
-    luax_pushtype(L, Texture, texture);
+  if (material) {
+    luax_pushtype(L, Material, material);
   } else {
     lua_pushnil(L);
   }
@@ -356,10 +356,10 @@ int l_lovrMeshGetTexture(lua_State* L) {
   return 1;
 }
 
-int l_lovrMeshSetTexture(lua_State* L) {
+int l_lovrMeshSetMaterial(lua_State* L) {
   Mesh* mesh = luax_checktype(L, 1, Mesh);
-  Texture* texture = lua_isnoneornil(L, 2) ? NULL : luax_checktype(L, 2, Texture);
-  lovrMeshSetTexture(mesh, texture);
+  Material* material = lua_isnoneornil(L, 2) ? NULL : luax_checktype(L, 2, Material);
+  lovrMeshSetMaterial(mesh, material);
   return 0;
 }
 
@@ -380,7 +380,7 @@ const luaL_Reg lovrMesh[] = {
   { "setDrawMode", l_lovrMeshSetDrawMode },
   { "getDrawRange", l_lovrMeshGetDrawRange },
   { "setDrawRange", l_lovrMeshSetDrawRange },
-  { "getTexture", l_lovrMeshGetTexture },
-  { "setTexture", l_lovrMeshSetTexture },
+  { "getMaterial", l_lovrMeshGetMaterial },
+  { "setMaterial", l_lovrMeshSetMaterial },
   { NULL, NULL }
 };

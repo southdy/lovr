@@ -1,5 +1,7 @@
 #include "graphics/font.h"
+#include "graphics/material.h"
 #include "graphics/shader.h"
+#include "graphics/shaders.h"
 #include "graphics/texture.h"
 #include "math/math.h"
 #include "lib/glfw.h"
@@ -8,8 +10,9 @@
 
 #define MAX_CANVASES 4
 #define MAX_TRANSFORMS 60
+#define MAX_TEXTURES 16
 #define INTERNAL_TRANSFORMS 4
-#define DEFAULT_SHADER_COUNT 4
+#define DEFAULT_MATERIAL_COUNT 5
 
 typedef enum {
   BLEND_ALPHA,
@@ -26,6 +29,14 @@ typedef enum {
   BLEND_ALPHA_MULTIPLY,
   BLEND_PREMULTIPLIED
 } BlendAlphaMode;
+
+typedef enum {
+  MATERIAL_STANDARD,
+  MATERIAL_UNLIT,
+  MATERIAL_FONT,
+  MATERIAL_SKYBOX,
+  MATERIAL_FULLSCREEN
+} DefaultMaterial;
 
 typedef enum {
   DRAW_MODE_FILL,
@@ -68,10 +79,8 @@ typedef enum {
 
 typedef struct {
   GLFWwindow* window;
-  Shader* defaultShaders[DEFAULT_SHADER_COUNT];
-  DefaultShader defaultShader;
+  Material* defaultMaterials[DEFAULT_MATERIAL_COUNT];
   Font* defaultFont;
-  Texture* defaultTexture;
   float transforms[MAX_TRANSFORMS + INTERNAL_TRANSFORMS][2][16];
   int transform;
   Color backgroundColor;
@@ -85,7 +94,6 @@ typedef struct {
   GraphicsLimits limits;
   float lineWidth;
   float pointSize;
-  Shader* shader;
   Winding winding;
   int wireframe;
   uint32_t streamVAO;
@@ -95,11 +103,11 @@ typedef struct {
   vec_uint_t streamIndices;
   CanvasState canvases[MAX_CANVASES];
   int canvas;
-  Texture* texture;
-  uint32_t program;
   uint32_t vertexArray;
   uint32_t vertexBuffer;
   uint32_t indexBuffer;
+  uint32_t program;
+  Texture* textures[MAX_TEXTURES];
 } GraphicsState;
 
 // Base
@@ -108,7 +116,6 @@ void lovrGraphicsDestroy();
 void lovrGraphicsReset();
 void lovrGraphicsClear(int color, int depth);
 void lovrGraphicsPresent();
-void lovrGraphicsPrepare();
 void lovrGraphicsCreateWindow(int w, int h, int fullscreen, int msaa, const char* title, const char* icon);
 int lovrGraphicsGetWidth();
 int lovrGraphicsGetHeight();
@@ -133,8 +140,6 @@ float lovrGraphicsGetLineWidth();
 void lovrGraphicsSetLineWidth(float width);
 float lovrGraphicsGetPointSize();
 void lovrGraphicsSetPointSize(float size);
-Shader* lovrGraphicsGetShader();
-void lovrGraphicsSetShader(Shader* shader);
 Winding lovrGraphicsGetWinding();
 void lovrGraphicsSetWinding(Winding winding);
 int lovrGraphicsIsWireframe();
@@ -152,12 +157,12 @@ void lovrGraphicsMatrixTransform(MatrixType type, mat4 transform);
 // Primitives
 void lovrGraphicsPoints(float* points, int count);
 void lovrGraphicsLine(float* points, int count);
-void lovrGraphicsTriangle(DrawMode mode, float* points);
-void lovrGraphicsPlane(DrawMode mode, Texture* texture, mat4 transform);
+void lovrGraphicsTriangle(DrawMode mode, Material* material, float* points);
+void lovrGraphicsPlane(DrawMode mode, Material* material, mat4 transform);
 void lovrGraphicsPlaneFullscreen(Texture* texture);
-void lovrGraphicsBox(DrawMode mode, Texture* texture, mat4 transform);
-void lovrGraphicsCylinder(float x1, float y1, float z1, float x2, float y2, float z2, float r1, float r2, int capped, int segments);
-void lovrGraphicsSphere(Texture* texture, mat4 transform, int segments);
+void lovrGraphicsBox(DrawMode mode, Material* material, mat4 transform);
+void lovrGraphicsCylinder(Material* material, float x1, float y1, float z1, float x2, float y2, float z2, float r1, float r2, int capped, int segments);
+void lovrGraphicsSphere(Material* material, mat4 transform, int segments);
 void lovrGraphicsSkybox(Texture* texture, float angle, float ax, float ay, float az);
 void lovrGraphicsPrint(const char* str, mat4 transform, float wrap, HorizontalAlign halign, VerticalAlign valign);
 
@@ -168,11 +173,10 @@ mat4 lovrGraphicsGetProjection();
 void lovrGraphicsSetProjection(mat4 projection);
 void lovrGraphicsSetViewport(int x, int y, int w, int h);
 void lovrGraphicsBindFramebuffer(int framebuffer);
-Texture* lovrGraphicsGetTexture();
-void lovrGraphicsBindTexture(Texture* texture);
-void lovrGraphicsSetDefaultShader(DefaultShader defaultShader);
-Shader* lovrGraphicsGetActiveShader();
-void lovrGraphicsBindProgram(uint32_t program);
 void lovrGraphicsBindVertexArray(uint32_t vao);
 void lovrGraphicsBindVertexBuffer(uint32_t vbo);
 void lovrGraphicsBindIndexBuffer(uint32_t ibo);
+void lovrGraphicsBindProgram(uint32_t program);
+void lovrGraphicsBindTexture(Texture* texture, int slot);
+void lovrGraphicsBindMaterial(Material* material);
+Material* lovrGraphicsGetDefaultMaterial(DefaultMaterial material);

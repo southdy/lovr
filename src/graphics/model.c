@@ -11,7 +11,7 @@ static void renderNode(Model* model, int nodeIndex) {
   lovrGraphicsPush();
   lovrGraphicsMatrixTransform(MATRIX_MODEL, node->transform);
 
-  Shader* shader = lovrGraphicsGetActiveShader();
+  /*Shader* shader = lovrGraphicsGetActiveShader();
   for (int i = 0; i < node->primitives.length; i++) {
     ModelPrimitive* primitive = &model->modelData->primitives[node->primitives.data[i]];
     ModelMaterial* material = &model->modelData->materials[primitive->material];
@@ -31,7 +31,7 @@ static void renderNode(Model* model, int nodeIndex) {
 
     lovrMeshSetDrawRange(model->mesh, primitive->drawStart, primitive->drawCount);
     lovrMeshDraw(model->mesh, NULL);
-  }
+  }*/
 
   for (int i = 0; i < node->children.length; i++) {
     renderNode(model, node->children.data[i]);
@@ -74,7 +74,7 @@ Model* lovrModelCreate(ModelData* modelData) {
   lovrMeshSetVertexMap(model->mesh, modelData->indices, modelData->indexCount);
   lovrMeshSetRangeEnabled(model->mesh, 1);
 
-  model->texture = NULL;
+  model->material = NULL;
 
   vec_deinit(&format);
   return model;
@@ -82,8 +82,8 @@ Model* lovrModelCreate(ModelData* modelData) {
 
 void lovrModelDestroy(const Ref* ref) {
   Model* model = containerof(ref, Model);
-  if (model->texture) {
-    lovrRelease(&model->texture->ref);
+  if (model->material) {
+    lovrRelease(&model->material->ref);
   }
   lovrModelDataDestroy(model->modelData);
   lovrRelease(&model->mesh->ref);
@@ -101,20 +101,20 @@ void lovrModelDraw(Model* model, mat4 transform) {
   lovrGraphicsPop();
 }
 
-Texture* lovrModelGetTexture(Model* model) {
-  return model->texture;
+Material* lovrModelGetMaterial(Model* model) {
+  return model->material;
 }
 
-void lovrModelSetTexture(Model* model, Texture* texture) {
-  if (model->texture) {
-    lovrRelease(&model->texture->ref);
+void lovrModelSetMaterial(Model* model, Material* material) {
+  if (model->material) {
+    lovrRelease(&model->material->ref);
   }
 
-  model->texture = texture;
-  lovrMeshSetTexture(model->mesh, model->texture);
+  model->material = material;
+  lovrMeshSetMaterial(model->mesh, model->material);
 
-  if (model->texture) {
-    lovrRetain(&model->texture->ref);
+  if (model->material) {
+    lovrRetain(&model->material->ref);
   }
 }
 

@@ -70,14 +70,16 @@ int l_lovrControllerVibrate(lua_State* L) {
 int l_lovrControllerNewModel(lua_State* L) {
   Controller* controller = luax_checktype(L, 1, Controller);
   ModelData* modelData = lovrHeadsetControllerNewModelData(controller);
-  TextureData* textureData = lovrHeadsetControllerNewTextureData(controller);
+  //TextureData* textureData = lovrHeadsetControllerNewTextureData(controller);
   if (modelData) {
     Model* model = lovrModelCreate(modelData);
+    /*
     if (textureData) {
       Texture* texture = lovrTextureCreate(TEXTURE_2D, &textureData, 1);
       lovrModelSetTexture(model, texture);
       lovrRelease(&texture->ref);
     }
+    */
     luax_pushtype(L, Model, model);
     lovrRelease(&model->ref);
   } else {

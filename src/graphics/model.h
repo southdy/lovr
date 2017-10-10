@@ -11,13 +11,13 @@ typedef struct {
   Ref ref;
   ModelData* modelData;
   Mesh* mesh;
-  Texture* texture;
+  Material* material;
   float aabb[6];
 } Model;
 
 Model* lovrModelCreate(ModelData* modelData);
 void lovrModelDestroy(const Ref* ref);
 void lovrModelDraw(Model* model, mat4 transform);
-Texture* lovrModelGetTexture(Model* model);
-void lovrModelSetTexture(Model* model, Texture* texture);
+Material* lovrModelGetMaterial(Model* model);
+void lovrModelSetMaterial(Model* model, Material* material);
 float* lovrModelGetAABB(Model* model);

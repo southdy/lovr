@@ -2,6 +2,7 @@
 #include "math/transform.h"
 
 int l_lovrShaderSend(lua_State* L) {
+  /*
   Shader* shader = luax_checktype(L, 1, Shader);
   const char* name = luaL_checkstring(L, 2);
   int n;
@@ -96,6 +97,7 @@ int l_lovrShaderSend(lua_State* L) {
   }
 
   lovrShaderSetUniformValue(shader, name, value);
+  */
   return 0;
 }
 

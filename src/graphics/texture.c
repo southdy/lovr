@@ -66,7 +66,7 @@ Texture* lovrTextureCreate(TextureType type, TextureData* slices[6], int sliceCo
   texture->sliceCount = sliceCount;
   memcpy(texture->slices, slices, sliceCount * sizeof(TextureData*));
   glGenTextures(1, &texture->id);
-  lovrGraphicsBindTexture(texture);
+  lovrGraphicsBindTexture(texture, 0);
   lovrTextureCreateStorage(texture);
   lovrTextureRefresh(texture);
   lovrTextureSetFilter(texture, lovrGraphicsGetDefaultFilter());
@@ -116,7 +116,7 @@ Texture* lovrTextureCreateWithFramebuffer(TextureData* textureData, TextureProje
   if (msaa) {
     glGenFramebuffers(1, &texture->resolveFramebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, texture->resolveFramebuffer);
-    glBindTexture(GL_TEXTURE_2D, texture->id);
+    lovrGraphicsBindTexture(texture, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture->id, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, texture->framebuffer);
   }
@@ -180,7 +180,7 @@ void lovrTextureResolveMSAA(Texture* texture) {
 }
 
 void lovrTextureRefresh(Texture* texture) {
-  lovrGraphicsBindTexture(texture);
+  lovrGraphicsBindTexture(texture, 0);
 
   validateSlices(texture->type, texture->slices, texture->sliceCount);
   texture->width = texture->slices[0]->width;
@@ -215,7 +215,7 @@ TextureFilter lovrTextureGetFilter(Texture* texture) {
 void lovrTextureSetFilter(Texture* texture, TextureFilter filter) {
   int hasMipmaps = texture->slices[0]->format.compressed || texture->slices[0]->mipmaps.generated;
   float anisotropy = filter.mode == FILTER_ANISOTROPIC ? MAX(filter.anisotropy, 1.) : 1.;
-  lovrGraphicsBindTexture(texture);
+  lovrGraphicsBindTexture(texture, 0);
   texture->filter = filter;
 
   switch (filter.mode) {
@@ -255,7 +255,7 @@ TextureWrap lovrTextureGetWrap(Texture* texture) {
 
 void lovrTextureSetWrap(Texture* texture, TextureWrap wrap) {
   texture->wrap = wrap;
-  lovrGraphicsBindTexture(texture);
+  lovrGraphicsBindTexture(texture, 0);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap.s);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap.t);
   if (texture->type == TEXTURE_CUBE) {

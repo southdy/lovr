@@ -12,13 +12,6 @@
 #define LOVR_MAX_UNIFORM_LENGTH 256
 
 typedef enum {
-  SHADER_DEFAULT,
-  SHADER_SKYBOX,
-  SHADER_FONT,
-  SHADER_FULLSCREEN
-} DefaultShader;
-
-typedef enum {
   UNIFORM_FLOAT,
   UNIFORM_MATRIX,
   UNIFORM_INT,
@@ -37,12 +30,12 @@ typedef struct {
   int index;
   int location;
   UniformType type;
+  UniformType baseType;
   int components;
   int count;
   size_t size;
   UniformValue value;
   int textureUnitOffset;
-  int dirty;
 } Uniform;
 
 typedef map_t(Uniform) map_uniform_t;
@@ -54,9 +47,9 @@ typedef struct {
 } Shader;
 
 Shader* lovrShaderCreate(const char* vertexSource, const char* fragmentSource);
-Shader* lovrShaderCreateDefault(DefaultShader type);
 void lovrShaderDestroy(const Ref* ref);
-void lovrShaderBind(Shader* shader, int force);
 int lovrShaderGetAttributeId(Shader* shader, const char* name);
 Uniform* lovrShaderGetUniform(Shader* shader, const char* name);
-void lovrShaderSetUniformValue(Shader* shader, const char* name, UniformValue value);
+void lovrShaderSetFloats(Shader* shader, const char* name, float* data, int count);
+void lovrShaderSetInts(Shader* shader, const char* name, int* data, int count);
+void lovrShaderSetTextures(Shader* shader, const char* name, Texture** data, int count);

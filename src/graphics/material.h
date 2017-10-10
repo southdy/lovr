@@ -16,3 +16,6 @@ Material* lovrMaterialCreate(Shader* shader);
 void lovrMaterialDestroy(const Ref* ref);
 Shader* lovrMaterialGetShader(Material* material);
 void lovrMaterialBind(Material* material);
+void lovrMaterialSetFloats(Material* material, const char* name, float* data, int count);
+void lovrMaterialSetInts(Material* material, const char* name, int* data, int count);
+void lovrMaterialSetTextures(Material* material, const char* name, Texture** data, int count);

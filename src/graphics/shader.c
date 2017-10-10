@@ -1,91 +1,9 @@
 #include "graphics/shader.h"
+#include "graphics/shaders.h"
 #include "graphics/graphics.h"
 #include "math/mat4.h"
 #include <stdio.h>
 #include <stdlib.h>
-
-static const char* lovrShaderVertexPrefix = ""
-#ifdef EMSCRIPTEN
-"#version 300 es \n"
-"precision mediump float; \n"
-#else
-"#version 150 \n"
-#endif
-"in vec3 lovrPosition; \n"
-"in vec3 lovrNormal; \n"
-"in vec2 lovrTexCoord; \n"
-"out vec2 texCoord; \n"
-"uniform mat4 lovrModel; \n"
-"uniform mat4 lovrView; \n"
-"uniform mat4 lovrProjection; \n"
-"uniform mat4 lovrTransform; \n"
-"uniform mat3 lovrNormalMatrix; \n";
-
-static const char* lovrShaderFragmentPrefix = ""
-#ifdef EMSCRIPTEN
-"#version 300 es \n"
-"precision mediump float; \n"
-#else
-"#version 150 \n"
-"in vec4 gl_FragCoord; \n"
-#endif
-"in vec2 texCoord; \n"
-"out vec4 lovrFragColor; \n"
-"uniform vec4 lovrColor; \n"
-"uniform vec4 lovrDiffuseColor; \n"
-"uniform sampler2D lovrTexture; \n";
-
-static const char* lovrShaderVertexSuffix = ""
-"void main() { \n"
-"  texCoord = lovrTexCoord; \n"
-"  gl_Position = position(lovrProjection, lovrTransform, vec4(lovrPosition, 1.0)); \n"
-"}";
-
-static const char* lovrShaderFragmentSuffix = ""
-"void main() { \n"
-"  lovrFragColor = color(lovrColor, lovrTexture, texCoord); \n"
-"}";
-
-static const char* lovrDefaultVertexShader = ""
-"vec4 position(mat4 projection, mat4 transform, vec4 vertex) { \n"
-"  return projection * transform * vertex; \n"
-"}";
-
-static const char* lovrDefaultFragmentShader = ""
-"vec4 color(vec4 graphicsColor, sampler2D image, vec2 uv) { \n"
-"  return lovrDiffuseColor * graphicsColor * texture(image, uv); \n"
-"}";
-
-static const char* lovrSkyboxVertexShader = ""
-"out vec3 texturePosition; \n"
-"vec4 position(mat4 projection, mat4 transform, vec4 vertex) { \n"
-"  texturePosition = vertex.xyz; \n"
-"  return projection * transform * vertex; \n"
-"}";
-
-static const char* lovrSkyboxFragmentShader = ""
-"in vec3 texturePosition; \n"
-"uniform samplerCube cube; \n"
-"vec4 color(vec4 graphicsColor, sampler2D image, vec2 uv) { \n"
-"  return graphicsColor * texture(cube, texturePosition); \n"
-"}";
-
-static const char* lovrFontFragmentShader = ""
-"float median(float r, float g, float b) { \n"
-"  return max(min(r, g), min(max(r, g), b)); \n"
-"} \n"
-"vec4 color(vec4 graphicsColor, sampler2D image, vec2 uv) { \n"
-"  vec3 col = texture(image, uv).rgb; \n"
-"  float sdf = median(col.r, col.g, col.b); \n"
-"  float w = fwidth(sdf); \n"
-"  float alpha = smoothstep(.5 - w, .5 + w, sdf); \n"
-"  return vec4(graphicsColor.rgb, graphicsColor.a * alpha); \n"
-"}";
-
-static const char* lovrNoopVertexShader = ""
-"vec4 position(mat4 projection, mat4 transform, vec4 vertex) { \n"
-"  return vertex; \n"
-"}";
 
 static GLuint compileShader(GLenum type, const char* source) {
   GLuint shader = glCreateShader(type);
@@ -167,7 +85,7 @@ static UniformType getUniformType(GLenum type, const char* debug) {
       return UNIFORM_SAMPLER;
 
     default:
-      lovrThrow("Unknown type for uniform '%s'", debug);
+      lovrThrow("Unsupported type for uniform '%s'", debug);
       return UNIFORM_FLOAT;
   }
 }
@@ -205,20 +123,19 @@ Shader* lovrShaderCreate(const char* vertexSource, const char* fragmentSource) {
   if (!shader) return NULL;
 
   // Vertex
-  vertexSource = vertexSource == NULL ? lovrDefaultVertexShader : vertexSource;
+  vertexSource = vertexSource == NULL ? lovrStandardVertexShader : vertexSource;
   char fullVertexSource[4096];
   snprintf(fullVertexSource, sizeof(fullVertexSource), "%s\n%s\n%s", lovrShaderVertexPrefix, vertexSource, lovrShaderVertexSuffix);
   GLuint vertexShader = compileShader(GL_VERTEX_SHADER, fullVertexSource);
 
   // Fragment
-  fragmentSource = fragmentSource == NULL ? lovrDefaultFragmentShader : fragmentSource;
+  fragmentSource = fragmentSource == NULL ? lovrStandardFragmentShader : fragmentSource;
   char fullFragmentSource[4096];
   snprintf(fullFragmentSource, sizeof(fullFragmentSource), "%s\n%s\n%s", lovrShaderFragmentPrefix, fragmentSource, lovrShaderFragmentSuffix);
   GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fullFragmentSource);
 
   // Link
   GLuint program = linkShaders(vertexShader, fragmentShader);
-  lovrGraphicsBindProgram(program);
   shader->program = program;
 
   // Store uniform info
@@ -240,9 +157,9 @@ Shader* lovrShaderCreate(const char* vertexSource, const char* fragmentSource) {
     uniform.index = i;
     uniform.location = glGetUniformLocation(program, uniform.name);
     uniform.type = getUniformType(type, uniform.name);
+    uniform.baseType = uniform.type == UNIFORM_MATRIX ? UNIFORM_FLOAT : uniform.type;
     uniform.components = getUniformComponents(type);
     uniform.textureUnitOffset = textureUnitOffset;
-    uniform.dirty = 1;
 
     switch (uniform.type) {
       case UNIFORM_FLOAT:
@@ -312,16 +229,6 @@ Shader* lovrShaderCreate(const char* vertexSource, const char* fragmentSource) {
   return shader;
 }
 
-Shader* lovrShaderCreateDefault(DefaultShader type) {
-  switch (type) {
-    case SHADER_DEFAULT: return lovrShaderCreate(NULL, NULL);
-    case SHADER_SKYBOX: return lovrShaderCreate(lovrSkyboxVertexShader, lovrSkyboxFragmentShader);
-    case SHADER_FONT: return lovrShaderCreate(NULL, lovrFontFragmentShader);
-    case SHADER_FULLSCREEN: return lovrShaderCreate(lovrNoopVertexShader, NULL);
-    default: lovrThrow("Unknown default shader type");
-  }
-}
-
 void lovrShaderDestroy(const Ref* ref) {
   Shader* shader = containerof(ref, Shader);
   glDeleteProgram(shader->program);
@@ -354,60 +261,81 @@ Uniform* lovrShaderGetUniform(Shader* shader, const char* name) {
   return map_get(&shader->uniforms, name);
 }
 
-void lovrShaderSetUniformValue(Shader* shader, const char* name, UniformValue value) {
+void lovrShaderUpdateUniform(Shader* shader, const char* name, UniformType baseType, void* data, int count, size_t size, const char* debug) {
   Uniform* uniform = lovrShaderGetUniform(shader, name);
 
-  if (!uniform || !memcmp(uniform->value.data, value.data, uniform->size)) {
+  if (!uniform) {
     return;
   }
 
-  lovrGraphicsBindProgram(shader->program);
+  if (uniform->baseType != baseType) {
+    lovrThrow("Unable to send %ss to uniform %s", debug, name);
+  }
+
+  if (count * size != uniform->size) {
+    lovrThrow("Expected %d %ss for uniform '%s', got %d", uniform->size / size, name, count);
+  }
+
+  if (!memcmp(uniform->value.data, data, count * size)) {
+    return;
+  }
 
   switch (uniform->type) {
     case UNIFORM_FLOAT:
       switch (uniform->components) {
-        case 1: glUniform1fv(uniform->location, uniform->count, value.floats); break;
-        case 2: glUniform2fv(uniform->location, uniform->count, value.floats); break;
-        case 3: glUniform3fv(uniform->location, uniform->count, value.floats); break;
-        case 4: glUniform4fv(uniform->location, uniform->count, value.floats); break;
+        case 1: glUniform1fv(uniform->location, count, data); break;
+        case 2: glUniform2fv(uniform->location, count, data); break;
+        case 3: glUniform3fv(uniform->location, count, data); break;
+        case 4: glUniform4fv(uniform->location, count, data); break;
       }
       break;
 
     case UNIFORM_MATRIX:
+      count /= uniform->components * uniform->components;
       switch (uniform->components) {
-        case 2: glUniformMatrix2fv(uniform->location, uniform->count, GL_FALSE, value.floats); break;
-        case 3: glUniformMatrix3fv(uniform->location, uniform->count, GL_FALSE, value.floats); break;
-        case 4: glUniformMatrix4fv(uniform->location, uniform->count, GL_FALSE, value.floats); break;
+        case 2: glUniformMatrix2fv(uniform->location, count, GL_FALSE, data); break;
+        case 3: glUniformMatrix3fv(uniform->location, count, GL_FALSE, data); break;
+        case 4: glUniformMatrix4fv(uniform->location, count, GL_FALSE, data); break;
       }
       break;
 
     case UNIFORM_INT:
       switch (uniform->components) {
-        case 1: glUniform1iv(uniform->location, uniform->count, value.ints); break;
-        case 2: glUniform2iv(uniform->location, uniform->count, value.ints); break;
-        case 3: glUniform3iv(uniform->location, uniform->count, value.ints); break;
-        case 4: glUniform4iv(uniform->location, uniform->count, value.ints); break;
+        case 1: glUniform1iv(uniform->location, count, data); break;
+        case 2: glUniform2iv(uniform->location, count, data); break;
+        case 3: glUniform3iv(uniform->location, count, data); break;
+        case 4: glUniform4iv(uniform->location, count, data); break;
       }
       break;
 
-    case UNIFORM_SAMPLER:
+    case UNIFORM_SAMPLER: {
+      Texture** textures = (Texture**) data;
       for (int i = 0; i < uniform->count; i++) {
-        if (value.textures[i]) {
-          lovrRetain(&value.textures[i]->ref);
+        if (textures[i]) {
+          lovrRetain(&textures[i]->ref);
         }
 
         if (uniform->value.textures[i]) {
           lovrRelease(&uniform->value.textures[i]->ref);
         }
 
-        glActiveTexture(GL_TEXTURE0 + uniform->textureUnitOffset + i);
-        lovrGraphicsBindTexture(value.textures[i]);
+        lovrGraphicsBindTexture(textures[i], uniform->textureUnitOffset + i);
       }
-      glActiveTexture(GL_TEXTURE0);
       break;
-
-    default: break;
+    }
   }
 
-  memcpy(uniform->value.data, value.data, uniform->size);
+  memcpy(uniform->value.data, data, count * size);
+}
+
+void lovrShaderSetFloats(Shader* shader, const char* name, float* data, int count) {
+  lovrShaderUpdateUniform(shader, name, UNIFORM_FLOAT, data, count, sizeof(float), "float");
+}
+
+void lovrShaderSetInts(Shader* shader, const char* name, int* data, int count) {
+  lovrShaderUpdateUniform(shader, name, UNIFORM_INT, data, count, sizeof(int), "int");
+}
+
+void lovrShaderSetTextures(Shader* shader, const char* name, Texture** data, int count) {
+  lovrShaderUpdateUniform(shader, name, UNIFORM_SAMPLER, data, count, sizeof(Texture*), "texture");
 }

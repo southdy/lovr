@@ -724,7 +724,7 @@ void lovrHeadsetRenderTo(headsetRenderCallback callback, void* userdata) {
     lovrTextureResolveMSAA(state.texture);
 
     // OpenVR changes the OpenGL texture binding, so we reset it after rendering
-    Texture* oldTexture = lovrGraphicsGetTexture();
+    //Texture* oldTexture = lovrGraphicsGetTexture();
 
     // Submit
     uintptr_t texture = (uintptr_t) state.texture->id;
@@ -734,7 +734,7 @@ void lovrHeadsetRenderTo(headsetRenderCallback callback, void* userdata) {
     state.compositor->Submit(vrEye, &eyeTexture, NULL, flags);
 
     // Reset to the correct texture
-    glBindTexture(GL_TEXTURE_2D, oldTexture->id);
+    //glBindTexture(GL_TEXTURE_2D, oldTexture->id);
   }
 
   state.isRendering = 0;
@@ -743,10 +743,10 @@ void lovrHeadsetRenderTo(headsetRenderCallback callback, void* userdata) {
   if (state.isMirrored) {
     Color oldColor = lovrGraphicsGetColor();
     lovrGraphicsSetColor((Color) { 255, 255, 255, 255 });
-    Shader* lastShader = lovrGraphicsGetShader();
-    lovrGraphicsSetShader(NULL);
+    //Shader* lastShader = lovrGraphicsGetShader();
+    //lovrGraphicsSetShader(NULL);
     lovrGraphicsPlaneFullscreen(state.texture);
-    lovrGraphicsSetShader(lastShader);
+    //lovrGraphicsSetShader(lastShader);
     lovrGraphicsSetColor(oldColor);
   }
 }

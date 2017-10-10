@@ -9,17 +9,17 @@ int l_lovrModelDraw(lua_State* L) {
   return 0;
 }
 
-int l_lovrModelGetTexture(lua_State* L) {
+int l_lovrModelGetMaterial(lua_State* L) {
   Model* model = luax_checktype(L, 1, Model);
-  Texture* texture = lovrModelGetTexture(model);
-  luax_pushtype(L, Texture, texture);
+  Material* material = lovrModelGetMaterial(model);
+  luax_pushtype(L, Material, material);
   return 1;
 }
 
-int l_lovrModelSetTexture(lua_State* L) {
+int l_lovrModelSetMaterial(lua_State* L) {
   Model* model = luax_checktype(L, 1, Model);
-  Texture* texture = luax_checktype(L, 2, Texture);
-  lovrModelSetTexture(model, texture);
+  Material* material = luax_checktype(L, 2, Material);
+  lovrModelSetMaterial(model, material);
   return 0;
 }
 
@@ -34,8 +34,8 @@ int l_lovrModelGetAABB(lua_State* L) {
 
 const luaL_Reg lovrModel[] = {
   { "draw", l_lovrModelDraw },
-  { "getTexture", l_lovrModelGetTexture },
-  { "setTexture", l_lovrModelSetTexture },
+  { "getMaterial", l_lovrModelGetMaterial },
+  { "setMaterial", l_lovrModelSetMaterial },
   { "getAABB", l_lovrModelGetAABB },
   { NULL, NULL }
 };
